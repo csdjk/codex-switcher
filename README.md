@@ -11,6 +11,7 @@
 
 ## Features
 
+- **中文 / English** – Switch instantly from **Menu → Settings → Language**. The app follows the system language on first launch, remembers your choice, and synchronizes the main window and tray popup.
 - **Multi-Account Management** – Add, rename, mask, import, export, and manage multiple Codex accounts in one place
 - **Quick Switching** – Switch between accounts from the main window, native tray menu, or tray popup while preserving rotated ChatGPT sessions
 - **Usage Stats** – View account usage stats for OAuth accounts, including lifetime tokens, daily buckets, streaks, activity insights, and top integrations
@@ -100,6 +101,16 @@ Optional environment variables:
 The browser dashboard serves the same UI and backend actions through `/api/invoke/*`, which makes it usable over LAN, Tailscale, or a remote host tunnel when you expose the chosen port safely.
 
 ## Usage and Reset Credits
+
+### 中英文切换
+
+打开右上角 **菜单 → 设置 → 语言**，选择「简体中文」或「English」。首次启动时中文系统默认中文，其他系统默认英文；手动选择会保存在当前设备（网页版按浏览器来源保存）。切换立即生效，不会清空正在填写的账号名称。
+
+主界面、账号卡片、用量统计、订阅日期、重置券、弹窗和托盘页面支持双语。原生菜单通过桌面事件同步语言；账号名称、邮箱、插件名称以及服务器返回的原始错误详情保持原样，便于识别和排查。
+
+验证记录与复测步骤见 [中英文切换验收](docs/中英文切换验收.md)。
+
+### Usage information
 
 Codex Switcher shows two kinds of account usage information:
 

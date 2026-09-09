@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { ImportAccountsSummary } from "../types";
 
 export type FileSource = string | File;
@@ -26,6 +27,8 @@ export async function invokeBackend<T>(
     const message =
       typeof payload?.error === "string"
         ? payload.error
+        : response.status === 404
+          ? "Backend API unavailable (404). Start the full application or check the backend connection."
         : `Request failed with status ${response.status}`;
     throw new Error(message);
   }
@@ -49,7 +52,7 @@ export async function pickAuthJsonFile(): Promise<FileSource | null> {
     const selected = await open({
       multiple: false,
       filters: [{ name: "JSON", extensions: ["json"] }],
-      title: "Select auth.json file",
+      title: t("Select auth.json file"),
     });
 
     if (!selected || Array.isArray(selected)) return null;
@@ -63,9 +66,9 @@ export async function exportFullBackupFile(): Promise<boolean> {
   if (isTauriRuntime()) {
     const { save } = await import("@tauri-apps/plugin-dialog");
     const selected = await save({
-      title: "Export Full Encrypted Account Config",
+      title: t("Export Full Encrypted Account Config"),
       defaultPath: "codex-switcher-full.cswf",
-      filters: [{ name: "Codex Switcher Full Backup", extensions: ["cswf"] }],
+      filters: [{ name: t("Codex Switcher Full Backup"), extensions: ["cswf"] }],
     });
 
     if (!selected) return false;
@@ -87,8 +90,8 @@ export async function importFullBackupFile(): Promise<ImportAccountsSummary | nu
     const { open } = await import("@tauri-apps/plugin-dialog");
     const selected = await open({
       multiple: false,
-      title: "Import Full Encrypted Account Config",
-      filters: [{ name: "Codex Switcher Full Backup", extensions: ["cswf"] }],
+      title: t("Import Full Encrypted Account Config"),
+      filters: [{ name: t("Codex Switcher Full Backup"), extensions: ["cswf"] }],
     });
 
     if (!selected || Array.isArray(selected)) return null;
@@ -107,7 +110,7 @@ export async function importFullBackupFile(): Promise<ImportAccountsSummary | nu
 }
 
 export function describeFileSource(source: FileSource | null): string {
-  if (!source) return "No file selected";
+  if (!source) return t("No file selected");
   return typeof source === "string" ? source : source.name;
 }
 
@@ -148,7 +151,7 @@ function downloadBase64File(
 }
 
 async function pickBrowserFile(accept: string): Promise<File | null> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = accept;
@@ -158,15 +161,8 @@ async function pickBrowserFile(accept: string): Promise<File | null> {
     const finish = (file: File | null) => {
       if (settled) return;
       settled = true;
-      window.removeEventListener("focus", handleWindowFocus);
       input.remove();
       resolve(file);
-    };
-
-    const handleWindowFocus = () => {
-      window.setTimeout(() => {
-        finish(input.files?.[0] ?? null);
-      }, 0);
     };
 
     input.addEventListener(
@@ -176,10 +172,17 @@ async function pickBrowserFile(accept: string): Promise<File | null> {
       },
       { once: true }
     );
+    // Window focus can precede the file change event. Only the chooser itself
+    // can tell us whether the user selected a file or cancelled the dialog.
+    input.addEventListener("cancel", () => finish(null), { once: true });
 
     document.body.appendChild(input);
-    window.addEventListener("focus", handleWindowFocus, { once: true });
-    input.click();
+    try {
+      input.click();
+    } catch (error) {
+      input.remove();
+      reject(error);
+    }
   });
 }
 

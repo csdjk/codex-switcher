@@ -1,7 +1,7 @@
 {
   "name": "codex-switcher",
   "private": true,
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "A multi-account manager for Codex CLI",
   "type": "module",
   "scripts": {
@@ -9,6 +9,9 @@
     "build": "tsc && vite build",
     "test:desktop-reopen": "node --experimental-strip-types --test tests/desktopReopen.test.ts",
     "test:reset-credits": "node --experimental-strip-types --test tests/resetCredits.test.ts",
+    "test:i18n": "node --experimental-strip-types --test tests/i18n.test.ts",
+    "test:i18n-ui": "node tests/i18n.browser.cjs",
+    "test:file-picker": "node tests/filePicker.browser.cjs",
     "preview": "vite preview",
     "tauri": "sh ./scripts/tauri.sh",
     "tauri:win": "tauri",
@@ -37,6 +40,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "playwright": "1.62.1",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.8.3",
     "vite": "^7.0.4"

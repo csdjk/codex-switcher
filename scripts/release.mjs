@@ -70,7 +70,7 @@ const parseCargoVersion = (contents) =>
   contents.match(/^version\s*=\s*"(\d+\.\d+\.\d+)"/m)?.[1] ?? null;
 
 const parseCargoLockVersion = (contents) =>
-  contents.match(/\[\[package\]\]\nname = "codex-switcher"\nversion = "(\d+\.\d+\.\d+)"/)?.[1] ??
+  contents.match(/\[\[package\]\]\r?\nname = "codex-switcher"\r?\nversion = "(\d+\.\d+\.\d+)"/)?.[1] ??
   null;
 
 const getVersionSnapshot = () => {

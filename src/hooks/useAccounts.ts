@@ -94,30 +94,40 @@ export function useAccounts() {
     }
   }, []);
 
+  const refreshSubscription = useCallback(async (account: AccountInfo) => {
+    if (account.auth_mode === "api_key") return;
+    try {
+      const updated = await invokeBackend<AccountInfo>("refresh_account_metadata", {
+        accountId: account.id,
+      });
+      setAccounts(prev => prev.map(a => a.id === account.id
+        ? { ...a, ...updated, subscriptionError: null } : a));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setAccounts(prev => prev.map(a => a.id === account.id
+        ? { ...a, subscriptionError: message } : a));
+    }
+  }, []);
+
   const refreshUsage = useCallback(
     async (
       accountList?: AccountInfo[] | AccountWithUsage[],
       options?: { refreshMetadata?: boolean }
     ) => {
       try {
-        let list = accountList ?? accountsRef.current;
+        const list = accountList ?? accountsRef.current;
         if (list.length === 0) {
           return;
         }
 
-        if (options?.refreshMetadata) {
-          await runWithConcurrency(
-            list,
-            async (account) => {
-              await invokeBackend<AccountInfo>("refresh_account_metadata", {
-                accountId: account.id,
-              });
-            },
-            maxConcurrentUsageRequests
-          );
-
-          list = await loadAccounts(true);
-        }
+        // Sync billing on explicit refresh and at least hourly during polling.
+        // A metadata failure must remain visible without blocking usage queries.
+        await runWithConcurrency(
+          list.filter(account => options?.refreshMetadata || !account.subscription ||
+            Date.now() - Date.parse(account.subscription.checked_at) >= 60 * 60 * 1000),
+          refreshSubscription,
+          maxConcurrentUsageRequests
+        );
 
         const accountIds = list.map((account) => account.id);
         const accountIdSet = new Set(accountIds);
@@ -169,7 +179,7 @@ export function useAccounts() {
         throw err;
       }
     },
-    [buildUsageError, loadAccounts, maxConcurrentUsageRequests, reportUsageToTray, runWithConcurrency]
+    [buildUsageError, refreshSubscription, maxConcurrentUsageRequests, reportUsageToTray, runWithConcurrency]
   );
 
   const refreshSingleUsage = useCallback(async (
@@ -178,8 +188,8 @@ export function useAccounts() {
   ) => {
     try {
       if (options?.refreshMetadata) {
-        await invokeBackend<AccountInfo>("refresh_account_metadata", { accountId });
-        await loadAccounts(true);
+        const account = accountsRef.current.find(a => a.id === accountId);
+        if (account) await refreshSubscription(account);
       }
 
       setAccounts((prev) =>
@@ -211,7 +221,7 @@ export function useAccounts() {
       );
       throw err;
     }
-  }, [buildUsageError, loadAccounts, reportUsageToTray]);
+  }, [buildUsageError, refreshSubscription, reportUsageToTray]);
 
   const warmupAccount = useCallback(async (accountId: string) => {
     try {
@@ -389,7 +399,7 @@ export function useAccounts() {
   }, []);
 
   useEffect(() => {
-    loadAccounts().then((accountList) => refreshUsage(accountList));
+    loadAccounts().then((accountList) => refreshUsage(accountList, { refreshMetadata: true }));
     
     // Auto-refresh usage every 60 seconds (same as official Codex CLI)
     const interval = setInterval(() => {

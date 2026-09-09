@@ -1,3 +1,5 @@
+use crate::language::text as tr;
+
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -190,7 +192,7 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>, store: &AccountsStore) -> tauri::R
 
     if store.accounts.is_empty() {
         menu.append(
-            &MenuItemBuilder::with_id("empty", "No accounts configured")
+            &MenuItemBuilder::with_id("empty", tr("No accounts configured", "尚未配置账号"))
                 .enabled(false)
                 .build(app)?,
         )?;
@@ -210,8 +212,14 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>, store: &AccountsStore) -> tauri::R
     append_dock_settings_menu(app, &menu)?;
     #[cfg(target_os = "macos")]
     menu.append(&PredefinedMenuItem::separator(app)?)?;
-    menu.append(&MenuItemBuilder::with_id(OPEN_ITEM_ID, "Open Codex Switcher").build(app)?)?;
-    menu.append(&MenuItemBuilder::with_id(QUIT_ITEM_ID, "Quit").build(app)?)?;
+    menu.append(
+        &MenuItemBuilder::with_id(
+            OPEN_ITEM_ID,
+            tr("Open Codex Switcher", "打开 Codex Switcher"),
+        )
+        .build(app)?,
+    )?;
+    menu.append(&MenuItemBuilder::with_id(QUIT_ITEM_ID, tr("Quit", "退出")).build(app)?)?;
     Ok(menu)
 }
 
@@ -220,17 +228,21 @@ fn append_dock_settings_menu<R: Runtime>(app: &AppHandle<R>, menu: &Menu<R>) -> 
     let settings = load_app_settings().unwrap_or_default();
     let dock_settings = Submenu::with_items(
         app,
-        "Dock Icon",
+        tr("Dock Icon", "程序坞图标"),
         true,
         &[
-            &CheckMenuItemBuilder::with_id(crate::app_menu::DOCK_SHOW_IN_DOCK_ID, "Show in Dock")
-                .checked(settings.dock_display_mode == crate::app_menu::DockDisplayMode::ShowInDock)
-                .build(app)?,
-            &CheckMenuItemBuilder::with_id(crate::app_menu::DOCK_MENU_BAR_ONLY_ID, "Menu Bar Only")
-                .checked(
-                    settings.dock_display_mode == crate::app_menu::DockDisplayMode::MenuBarOnly,
-                )
-                .build(app)?,
+            &CheckMenuItemBuilder::with_id(
+                crate::app_menu::DOCK_SHOW_IN_DOCK_ID,
+                tr("Show in Dock", "显示在程序坞"),
+            )
+            .checked(settings.dock_display_mode == crate::app_menu::DockDisplayMode::ShowInDock)
+            .build(app)?,
+            &CheckMenuItemBuilder::with_id(
+                crate::app_menu::DOCK_MENU_BAR_ONLY_ID,
+                tr("Menu Bar Only", "仅菜单栏"),
+            )
+            .checked(settings.dock_display_mode == crate::app_menu::DockDisplayMode::MenuBarOnly)
+            .build(app)?,
         ],
     )?;
     menu.append(&dock_settings)?;
@@ -300,6 +312,8 @@ fn refresh_menu_on_main_thread<R: Runtime>(app: &AppHandle<R>) {
     match load_accounts()
         .map_err(|error| error.to_string())
         .and_then(|store| {
+            #[cfg(target_os = "windows")]
+            refresh_windows_quota_icons(app, &tray, &store);
             let settings = load_app_settings().unwrap_or_default();
             let title = active_tray_title(
                 store.active_account_id.as_deref(),
@@ -318,6 +332,61 @@ fn refresh_menu_on_main_thread<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn refresh_windows_quota_icons<R: Runtime>(
+    app: &AppHandle<R>,
+    tray: &tauri::tray::TrayIcon<R>,
+    store: &AccountsStore,
+) {
+    let usage = match TRAY_USAGE.lock() {
+        Ok(cache) => store
+            .active_account_id
+            .as_ref()
+            .and_then(|id| cache.get(id))
+            .cloned(),
+        Err(error) => {
+            eprintln!("Failed to read quota icon data: {error}");
+            None
+        }
+    };
+    let remaining = crate::quota_icon::remaining(usage.as_ref());
+    let icon = crate::quota_icon::render(remaining);
+    if let Some(window) = app.get_webview_window("main") {
+        if let Err(error) = window.set_icon(icon.clone()) {
+            eprintln!("Failed to update Windows taskbar quota icon: {error}");
+        }
+    }
+    if let Err(error) = tray.set_icon(Some(icon)) {
+        eprintln!("Failed to update Windows tray quota icon: {error}");
+    }
+    let description = match remaining {
+        Some(value) => format!(
+            "{}: {value}%\n{}",
+            tr("Remaining quota", "剩余额度"),
+            tr("Lowest remaining limit", "取各额度窗口中剩余最少的一项")
+        ),
+        None => tr(
+            "Quota unavailable / waiting for update",
+            "额度未知／等待更新",
+        )
+        .to_string(),
+    };
+    let detail = usage
+        .filter(|usage| usage.error.is_none())
+        .map(|usage| {
+            usage_title(
+                usage.primary_used_percent,
+                usage.primary_window_minutes,
+                usage.secondary_used_percent,
+                usage.secondary_window_minutes,
+            )
+        })
+        .unwrap_or_default();
+    if let Err(error) = tray.set_tooltip(Some(format!("Codex Switcher\n{description}\n{detail}"))) {
+        eprintln!("Failed to update Windows quota tooltip: {error}");
+    }
+}
+
 fn refresh_tray_display<R: Runtime>(
     tray: &tauri::tray::TrayIcon<R>,
     mode: TrayDisplayMode,
@@ -328,7 +397,7 @@ fn refresh_tray_display<R: Runtime>(
             if let Err(error) = tray.set_visible(true) {
                 eprintln!("Failed to show tray icon: {error}");
             }
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(target_os = "macos")]
             {
                 if let Err(error) = tray.set_icon(Some(TRAY_ICON)) {
                     eprintln!("Failed to refresh tray icon: {error}");
@@ -351,10 +420,6 @@ fn refresh_tray_display<R: Runtime>(
             #[cfg(target_os = "macos")]
             if let Err(error) = tray.set_icon(None) {
                 eprintln!("Failed to hide tray icon: {error}");
-            }
-            #[cfg(target_os = "windows")]
-            if let Err(error) = tray.set_icon(Some(TRAY_ICON)) {
-                eprintln!("Failed to refresh tray icon: {error}");
             }
             if let Err(error) = tray.set_title(title) {
                 eprintln!("Failed to refresh tray title: {error}");
@@ -405,14 +470,12 @@ fn active_usage_title(active_account_id: Option<&str>) -> String {
         .and_then(|cache| cache.get(active_account_id).cloned());
 
     match usage {
-        Some(usage) if usage.error.is_none() => {
-            usage_title(
-                usage.primary_used_percent,
-                usage.primary_window_minutes,
-                usage.secondary_used_percent,
-                usage.secondary_window_minutes,
-            )
-        }
+        Some(usage) if usage.error.is_none() => usage_title(
+            usage.primary_used_percent,
+            usage.primary_window_minutes,
+            usage.secondary_used_percent,
+            usage.secondary_window_minutes,
+        ),
         _ => "H:-- W:--".to_string(),
     }
 }
@@ -425,13 +488,13 @@ fn usage_title(
 ) -> String {
     let mut parts = Vec::new();
     if let Some(remaining) = remaining_percent_label(primary_used_percent) {
-        let label = window_duration_label(primary_window_minutes)
-            .unwrap_or_else(|| "H".to_string());
+        let label =
+            window_duration_label(primary_window_minutes).unwrap_or_else(|| "H".to_string());
         parts.push(format!("{label}:{remaining}"));
     }
     if let Some(remaining) = remaining_percent_label(secondary_used_percent) {
-        let label = window_duration_label(secondary_window_minutes)
-            .unwrap_or_else(|| "W".to_string());
+        let label =
+            window_duration_label(secondary_window_minutes).unwrap_or_else(|| "W".to_string());
         parts.push(format!("{label}:{remaining}"));
     }
 
@@ -485,8 +548,8 @@ fn usage_suffix(account_id: &str) -> String {
 
     let mut parts = Vec::new();
     if let Some(remaining) = session_remaining_title(usage.primary_used_percent, false) {
-        let label = window_duration_label(usage.primary_window_minutes)
-            .unwrap_or_else(|| "S".to_string());
+        let label =
+            window_duration_label(usage.primary_window_minutes).unwrap_or_else(|| "S".to_string());
         parts.push(format!("{label}:{remaining}"));
     }
     if let Some(used) = usage.secondary_used_percent {
@@ -556,9 +619,18 @@ fn poll_active_account_usage<R: Runtime>(app: AppHandle<R>) {
 
         if let Some(account) = account {
             match tauri::async_runtime::block_on(get_account_usage(&account)) {
-                // Keep the last known title on transient fetch errors.
+                // Windows clears the gauge on failure instead of showing stale quota.
                 Ok(usage) => ingest_usage(&app, vec![usage]),
-                Err(error) => eprintln!("Failed to poll usage for tray title: {error}"),
+                Err(error) => {
+                    eprintln!("Failed to poll usage for tray title: {error}");
+                    #[cfg(target_os = "windows")]
+                    {
+                        if let Ok(mut cache) = TRAY_USAGE.lock() {
+                            cache.remove(&account.id);
+                        }
+                        refresh_menu(&app);
+                    }
+                }
             }
         }
 
@@ -644,17 +716,17 @@ mod tests {
             usage_title(None, None, Some(35.0), Some(7 * 24 * 60)),
             "7d:65%"
         );
-        assert_eq!(
-            usage_title(Some(27.0), Some(5 * 60), None, None),
-            "5h:73%"
-        );
+        assert_eq!(usage_title(Some(27.0), Some(5 * 60), None, None), "5h:73%");
         assert_eq!(usage_title(None, None, None, None), "H:-- W:--");
     }
 
     #[test]
     fn window_duration_labels_round_to_hours_and_days() {
         assert_eq!(window_duration_label(Some(5 * 60)), Some("5h".to_string()));
-        assert_eq!(window_duration_label(Some(12 * 60)), Some("12h".to_string()));
+        assert_eq!(
+            window_duration_label(Some(12 * 60)),
+            Some("12h".to_string())
+        );
         assert_eq!(
             window_duration_label(Some(7 * 24 * 60)),
             Some("7d".to_string())

@@ -70,6 +70,14 @@ impl Default for AccountsStore {
     }
 }
 
+/// Subscription dates read from the live account entitlement, never from JWT claims.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubscriptionInfo {
+    pub renews_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub checked_at: DateTime<Utc>,
+}
+
 /// A stored account with all its metadata and credentials
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredAccount {
@@ -84,6 +92,8 @@ pub struct StoredAccount {
     /// Subscription expiration extracted from ChatGPT ID token, when available
     #[serde(default)]
     pub subscription_expires_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub subscription: Option<SubscriptionInfo>,
     /// Authentication mode
     pub auth_mode: AuthMode,
     /// Authentication credentials
@@ -129,6 +139,7 @@ impl StoredAccount {
             email: None,
             plan_type: None,
             subscription_expires_at: None,
+            subscription: None,
             auth_mode: AuthMode::ApiKey,
             auth_data: AuthData::ApiKey { key: api_key },
             created_at: Utc::now(),
@@ -154,6 +165,7 @@ impl StoredAccount {
             email,
             plan_type,
             subscription_expires_at,
+            subscription: None,
             auth_mode: AuthMode::ChatGPT,
             auth_data: AuthData::ChatGPT {
                 id_token,
@@ -352,6 +364,7 @@ pub struct AccountInfo {
     pub email: Option<String>,
     pub plan_type: Option<String>,
     pub subscription_expires_at: Option<DateTime<Utc>>,
+    pub subscription: Option<SubscriptionInfo>,
     pub auth_mode: AuthMode,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
@@ -360,22 +373,13 @@ pub struct AccountInfo {
 
 impl AccountInfo {
     pub fn from_stored(account: &StoredAccount, active_id: Option<&str>) -> Self {
-        let fallback_subscription_expires_at = match &account.auth_data {
-            AuthData::ChatGPT { id_token, .. } => {
-                parse_chatgpt_id_token_claims(id_token).subscription_expires_at
-            }
-            AuthData::ApiKey { .. } => None,
-        };
-
         Self {
             id: account.id.clone(),
             name: account.name.clone(),
             email: account.email.clone(),
             plan_type: account.plan_type.clone(),
-            subscription_expires_at: account
-                .subscription_expires_at
-                .clone()
-                .or(fallback_subscription_expires_at),
+            subscription_expires_at: account.subscription.as_ref().and_then(|s| s.expires_at),
+            subscription: account.subscription.clone(),
             auth_mode: account.auth_mode,
             is_active: active_id == Some(&account.id),
             created_at: account.created_at,
@@ -502,6 +506,37 @@ pub struct CreditStatusDetails {
 mod tests {
     use super::{parse_chatgpt_id_token_claims, AppSettings, DockDisplayMode, TrayDisplayMode};
     use base64::Engine;
+
+    #[test]
+    fn subscription_never_exposes_legacy_or_jwt_dates_as_live_metadata() {
+        let legacy_date = "2026-08-31T00:00:00Z".parse().unwrap();
+        let mut stored = super::StoredAccount::new_chatgpt(
+            "test".into(),
+            None,
+            Some("pro".into()),
+            Some(legacy_date),
+            "header.payload.signature".into(),
+            "test-access".into(),
+            "test-refresh".into(),
+            None,
+        );
+        let mut legacy = serde_json::to_value(&stored).unwrap();
+        legacy.as_object_mut().unwrap().remove("subscription");
+        stored = serde_json::from_value(legacy).unwrap();
+        let info = super::AccountInfo::from_stored(&stored, None);
+        assert!(info.subscription.is_none());
+        assert!(info.subscription_expires_at.is_none());
+
+        // Even a successful live response with no dates must not revive the old date.
+        stored.subscription = Some(super::SubscriptionInfo {
+            renews_at: None,
+            expires_at: None,
+            checked_at: chrono::Utc::now(),
+        });
+        assert!(super::AccountInfo::from_stored(&stored, None)
+            .subscription_expires_at
+            .is_none());
+    }
 
     #[test]
     fn parses_subscription_expiry_from_realistic_id_token_claims() {

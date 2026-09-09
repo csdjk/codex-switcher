@@ -1,3 +1,4 @@
+import { t, pluralSuffix } from "../lib/i18n";
 import { useCallback, useState } from "react";
 import type { CodexProcessInfo } from "../types";
 import { invokeBackend } from "../lib/platform";
@@ -38,25 +39,21 @@ export function useForceCloseCodexProcesses({
       const closedCount = Math.max(0, processCount - remainingCount);
 
       if (!latestProcessInfo) {
-        showToast("Could not verify that Codex closed. Account switching and reopening were skipped.", true);
+        showToast(t("Could not verify that Codex closed. Account switching and reopening were skipped."), true);
       } else if (result.targeted_count === 0) {
-        showToast("No running Codex processes found.");
+        showToast(t("No running Codex processes found."));
       } else if (remainingCount === 0) {
         showToast(
-          `Force closed ${processCount} Codex session${
-            processCount === 1 ? "" : "s"
-          }.`
+          t("Force closed {0} Codex session{1}.", processCount, pluralSuffix(processCount))
         );
       } else if (closedCount > 0) {
         showToast(
-          `Force closed ${closedCount}/${processCount} Codex sessions. ${remainingCount} still running.`,
+          t("Force closed {0}/{1} Codex sessions. {2} still running.", closedCount, processCount, remainingCount),
           true
         );
       } else {
         showToast(
-          `Could not force close ${remainingCount} Codex session${
-            remainingCount === 1 ? "" : "s"
-          }.`,
+          t("Could not force close {0} Codex session{1}.", remainingCount, pluralSuffix(remainingCount)),
           true
         );
       }
@@ -64,7 +61,7 @@ export function useForceCloseCodexProcesses({
       return { processInfo: latestProcessInfo, reopenToken: result.reopen_token ?? null };
     } catch (err) {
       console.error("Failed to force close Codex processes:", err);
-      showToast(`Force close failed: ${formatError(err)}`, true);
+      showToast(t("Force close failed: {0}", formatError(err)), true);
       return null;
     } finally {
       setConfirmOpen(false);

@@ -7,7 +7,8 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 
 use crate::types::{
-    parse_chatgpt_id_token_claims, AccountsStore, AppSettings, AuthData, AuthDotJson, StoredAccount,
+    parse_chatgpt_id_token_claims, AccountsStore, AppSettings, AuthData, AuthDotJson,
+    StoredAccount, SubscriptionInfo,
 };
 
 pub fn sync_active_account_tokens(store: &mut AccountsStore, auth: &AuthDotJson) -> bool {
@@ -250,7 +251,7 @@ pub fn update_account_metadata(
     name: Option<String>,
     email: Option<String>,
     plan_type: Option<String>,
-    subscription_expires_at: Option<Option<DateTime<Utc>>>,
+    subscription: Option<SubscriptionInfo>,
 ) -> Result<StoredAccount> {
     let mut store = load_accounts()?;
 
@@ -284,8 +285,9 @@ pub fn update_account_metadata(
         account.plan_type = plan_type;
     }
 
-    if let Some(subscription_expires_at) = subscription_expires_at {
-        account.subscription_expires_at = subscription_expires_at;
+    if let Some(subscription) = subscription {
+        account.subscription_expires_at = subscription.expires_at;
+        account.subscription = Some(subscription);
     }
 
     let updated = account.clone();

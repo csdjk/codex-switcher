@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use crate::auth::{ensure_chatgpt_tokens_fresh, refresh_chatgpt_tokens};
 use crate::types::{
     AuthData, CreditStatusDetails, RateLimitDetails, RateLimitStatusPayload, RateLimitWindow,
-    StoredAccount, UsageInfo,
+    StoredAccount, SubscriptionInfo, UsageInfo,
 };
 
 const CHATGPT_BACKEND_API: &str = "https://chatgpt.com/backend-api";
@@ -35,7 +35,7 @@ const WEEKLY_WINDOW_SECONDS: i32 = 7 * 24 * 60 * 60;
 #[derive(Debug, Clone)]
 pub struct ChatGptAccountMetadata {
     pub plan_type: Option<String>,
-    pub subscription_expires_at: Option<DateTime<Utc>>,
+    pub subscription: SubscriptionInfo,
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,6 +62,8 @@ struct AccountsCheckAccount {
 struct AccountsCheckEntitlement {
     #[serde(default)]
     expires_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    renews_at: Option<DateTime<Utc>>,
 }
 
 /// Get usage information for an account
@@ -129,21 +131,33 @@ pub async fn fetch_chatgpt_account_metadata(
         .await
         .context("Failed to parse accounts check response")?;
 
-    let selected_entry = chatgpt_account_id
-        .and_then(|account_id| payload.accounts.get(account_id))
-        .or_else(|| payload.accounts.get("default"))
-        .or_else(|| payload.accounts.values().next())
-        .context("Accounts check response did not include an account entry")?;
+    metadata_from_accounts_check(&payload, chatgpt_account_id)
+}
+
+fn metadata_from_accounts_check(
+    payload: &AccountsCheckResponse,
+    chatgpt_account_id: Option<&str>,
+) -> Result<ChatGptAccountMetadata> {
+    let selected_entry = match chatgpt_account_id {
+        Some(account_id) => payload.accounts.get(account_id),
+        None => payload.accounts.get("default"),
+    }
+    .context("Accounts check response did not include the requested account")?;
+    let entitlement = selected_entry
+        .entitlement
+        .as_ref()
+        .context("Accounts check response did not include subscription entitlement")?;
 
     Ok(ChatGptAccountMetadata {
         plan_type: selected_entry
             .account
             .as_ref()
             .and_then(|account| account.plan_type.clone()),
-        subscription_expires_at: selected_entry
-            .entitlement
-            .as_ref()
-            .and_then(|entitlement| entitlement.expires_at),
+        subscription: SubscriptionInfo {
+            renews_at: entitlement.renews_at,
+            expires_at: entitlement.expires_at,
+            checked_at: Utc::now(),
+        },
     })
 }
 
@@ -393,6 +407,7 @@ async fn send_chatgpt_get_request(
     client
         .get(url)
         .headers(headers)
+        .timeout(std::time::Duration::from_secs(20))
         .send()
         .await
         .with_context(|| format!("Failed to send GET request to {url}"))
@@ -586,6 +601,55 @@ pub async fn refresh_all_usage(accounts: &[StoredAccount]) -> Vec<UsageInfo> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn subscription_keeps_billing_renewal_separate_from_entitlement_expiry() {
+        let payload = serde_json::from_value(serde_json::json!({"accounts": {
+            "requested": {"account":{"plan_type":"pro"}, "entitlement": {
+                "renews_at":"2026-10-08T04:28:49Z", "expires_at":"2026-10-09T05:28:49Z"
+            }},
+            "default": {"entitlement":{"renews_at":"2026-01-01T00:00:00Z"}}
+        }}))
+        .unwrap();
+        let metadata = super::metadata_from_accounts_check(&payload, Some("requested")).unwrap();
+        assert_eq!(
+            metadata
+                .subscription
+                .renews_at
+                .unwrap()
+                .date_naive()
+                .to_string(),
+            "2026-10-08"
+        );
+        assert_eq!(
+            metadata
+                .subscription
+                .expires_at
+                .unwrap()
+                .date_naive()
+                .to_string(),
+            "2026-10-09"
+        );
+        assert!(super::metadata_from_accounts_check(&payload, Some("missing")).is_err());
+    }
+
+    #[test]
+    fn subscription_without_renewal_does_not_invent_a_billing_date() {
+        let payload = serde_json::from_value(serde_json::json!({"accounts": {
+            "default": {"entitlement":{"renews_at":null,"expires_at":"2026-10-09T05:28:49Z"}}
+        }}))
+        .unwrap();
+        let metadata = super::metadata_from_accounts_check(&payload, None).unwrap();
+        assert!(metadata.subscription.renews_at.is_none());
+        assert!(metadata.subscription.expires_at.is_some());
+    }
+
+    #[test]
+    fn missing_subscription_entitlement_is_an_error() {
+        let payload =
+            serde_json::from_value(serde_json::json!({"accounts": {"default": {}}})).unwrap();
+        assert!(super::metadata_from_accounts_check(&payload, None).is_err());
+    }
+
     use super::*;
 
     fn rate_limit_window(used_percent: f64, window_seconds: i32) -> RateLimitWindow {

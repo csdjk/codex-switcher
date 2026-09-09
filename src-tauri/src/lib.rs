@@ -6,6 +6,10 @@ pub mod app_menu;
 pub mod auth;
 pub mod commands;
 #[cfg(desktop)]
+mod language;
+#[cfg(target_os = "windows")]
+mod quota_icon;
+#[cfg(desktop)]
 pub mod tray;
 pub mod types;
 pub mod web;
@@ -35,6 +39,7 @@ pub fn run() {
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
                 app_menu::setup(app.handle())?;
                 tray::setup(app.handle())?;
+                language::setup(app.handle());
             }
             Ok(())
         })
