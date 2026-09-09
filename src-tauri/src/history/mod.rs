@@ -1099,6 +1099,11 @@ struct RawProjectRoot {
     path: String,
 }
 
+struct ProjectRootMatch {
+    project_id: String,
+    normalized_root: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProjectListResponse {
@@ -1177,6 +1182,7 @@ fn build_overview(
     archived_threads: Vec<RawThread>,
     query: HistoryListQuery,
 ) -> Result<HistoryOverview, String> {
+    let project_roots = build_project_root_matches(&projects);
     let all_threads: Vec<(&RawThread, bool)> = active_threads
         .iter()
         .map(|thread| (thread, false))
@@ -1199,14 +1205,16 @@ fn build_overview(
                 .iter()
                 .filter(|thread| {
                     thread.effective_parent_id().is_none()
-                        && thread.project_id.as_deref() == Some(project.id.as_str())
+                        && effective_project_id(thread, &project_roots)
+                            == Some(project.id.as_str())
                 })
                 .count(),
             archived_thread_count: archived_threads
                 .iter()
                 .filter(|thread| {
                     thread.effective_parent_id().is_none()
-                        && thread.project_id.as_deref() == Some(project.id.as_str())
+                        && effective_project_id(thread, &project_roots)
+                            == Some(project.id.as_str())
                 })
                 .count(),
             id: project.id,
@@ -1230,7 +1238,12 @@ fn build_overview(
     let mut filtered: Vec<&RawThread> = requested_threads
         .iter()
         .filter(|thread| thread.effective_parent_id().is_none())
-        .filter(|thread| project_matches(thread, &query.project_filter))
+        .filter(|thread| {
+            project_matches(
+                effective_project_id(thread, &project_roots),
+                &query.project_filter,
+            )
+        })
         .filter(|thread| {
             query
                 .source_kind
@@ -1268,7 +1281,7 @@ fn build_overview(
             id: thread.id.clone(),
             title: display_title(thread),
             cwd: thread.cwd.clone(),
-            project_id: thread.project_id.clone(),
+            project_id: effective_project_id(thread, &project_roots).map(str::to_string),
             source_kind: source_kind(&thread.source),
             status: thread.status.kind.clone(),
             active_flags: thread.status.active_flags.clone(),
@@ -1304,12 +1317,80 @@ fn parse_page_cursor(cursor: Option<&str>) -> Result<usize, String> {
         .map_err(|_| "Invalid history page cursor".to_string())
 }
 
-fn project_matches(thread: &RawThread, filter: &HistoryProjectFilter) -> bool {
+fn build_project_root_matches(projects: &[RawProject]) -> Vec<ProjectRootMatch> {
+    projects
+        .iter()
+        .flat_map(|project| {
+            project.roots.iter().filter_map(|root| {
+                let normalized_root = normalize_history_path(&root.path);
+                (!normalized_root.is_empty()).then(|| ProjectRootMatch {
+                    project_id: project.id.clone(),
+                    normalized_root,
+                })
+            })
+        })
+        .collect()
+}
+
+fn effective_project_id<'a>(
+    thread: &'a RawThread,
+    roots: &'a [ProjectRootMatch],
+) -> Option<&'a str> {
+    if let Some(project_id) = thread.project_id.as_deref() {
+        return Some(project_id);
+    }
+
+    let cwd = normalize_history_path(&thread.cwd);
+    roots
+        .iter()
+        .filter(|root| history_path_is_within(&cwd, &root.normalized_root))
+        .max_by_key(|root| root.normalized_root.len())
+        .map(|root| root.project_id.as_str())
+}
+
+fn normalize_history_path(path: &str) -> String {
+    let replaced = path.trim().replace('\\', "/");
+    let prefix = if replaced.starts_with("//") {
+        "//"
+    } else if replaced.starts_with('/') {
+        "/"
+    } else {
+        ""
+    };
+    let mut components = Vec::new();
+    for component in replaced.split('/') {
+        match component {
+            "" | "." => {}
+            ".." if components.last().is_some_and(|value| *value != "..") => {
+                components.pop();
+            }
+            ".." if prefix.is_empty() => components.push(component),
+            ".." => {}
+            _ => components.push(component),
+        }
+    }
+    let mut normalized = format!("{prefix}{}", components.join("/"));
+    if cfg!(windows) {
+        normalized = normalized.to_lowercase();
+    }
+    normalized
+}
+
+fn history_path_is_within(path: &str, root: &str) -> bool {
+    path == root
+        || (path.starts_with(root)
+            && path
+                .as_bytes()
+                .get(root.len())
+                .is_some_and(|value| *value == b'/'))
+}
+
+fn project_matches(effective_project_id: Option<&str>, filter: &HistoryProjectFilter) -> bool {
     match filter {
         HistoryProjectFilter::All => true,
-        HistoryProjectFilter::Unassigned => thread.project_id.is_none(),
+        HistoryProjectFilter::Unassigned => effective_project_id.is_none(),
         HistoryProjectFilter::Project { project_id } => {
-            thread.project_id.as_deref() == Some(project_id.as_str())
+            effective_project_id == Some(project_id.as_str())
         }
     }
 }
@@ -1617,10 +1698,12 @@ mod tests {
                 }
             }
         });
+        let mut other = thread("other", "Other task", None, None, 20);
+        other.cwd = "C:/notes".into();
         let active = vec![
             thread("parent", "Parent task", Some("project-a"), None, 30),
             child,
-            thread("other", "Other task", None, None, 20),
+            other,
         ];
         let archived = vec![thread("old", "Old task", Some("project-a"), None, 10)];
         let query = HistoryListQuery {
@@ -1641,6 +1724,58 @@ mod tests {
         assert_eq!(overview.projects[0].active_thread_count, 1);
         assert_eq!(overview.projects[0].archived_thread_count, 1);
         assert_eq!(overview.next_cursor, None);
+    }
+
+    #[test]
+    fn overview_infers_project_from_the_most_specific_root_when_project_id_is_missing() {
+        let capabilities = HistoryCapabilities {
+            available: true,
+            cli_version: "0.153.4".into(),
+            cli_path: "codex".into(),
+            codex_home: "C:/codex".into(),
+            project_management: true,
+            minimum_cli_version: "0.153.4".into(),
+        };
+        let projects = vec![
+            RawProject {
+                id: "games".into(),
+                name: "Games".into(),
+                roots: vec![RawProjectRoot {
+                    path: "E:/work/games".into(),
+                }],
+                recency_at: Some(20),
+            },
+            RawProject {
+                id: "unity".into(),
+                name: "Unity".into(),
+                roots: vec![RawProjectRoot {
+                    path: "E:\\work\\games\\unity".into(),
+                }],
+                recency_at: Some(30),
+            },
+        ];
+        let mut unity_thread = thread("unity-thread", "Unity task", None, None, 30);
+        unity_thread.cwd = "E:/work/games/unity/client".into();
+        let query = HistoryListQuery {
+            project_filter: HistoryProjectFilter::Project {
+                project_id: "unity".into(),
+            },
+            ..HistoryListQuery::default()
+        };
+
+        let overview = build_overview(
+            capabilities,
+            projects,
+            vec![unity_thread],
+            Vec::new(),
+            query,
+        )
+        .unwrap();
+
+        assert_eq!(overview.filtered_count, 1);
+        assert_eq!(overview.threads[0].project_id.as_deref(), Some("unity"));
+        assert_eq!(overview.projects[0].active_thread_count, 0);
+        assert_eq!(overview.projects[1].active_thread_count, 1);
     }
 
     #[test]

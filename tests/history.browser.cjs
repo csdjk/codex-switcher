@@ -37,12 +37,18 @@ const threads = [
   },
 ];
 
-function overview(mode, archived = false) {
-  const data = mode.value === 'empty'
+function overview(mode, archived = false, query = null) {
+  const unfiltered = mode.value === 'empty'
     ? []
     : archived
       ? [{ ...threads[1], id: 'thread-archived', title: '旧版资源检查', archived: true }]
       : threads;
+  const data = unfiltered.filter(thread => {
+    const projectFilter = query?.projectFilter;
+    if (!projectFilter || projectFilter.kind === 'all') return true;
+    if (projectFilter.kind === 'unassigned') return thread.project_id === null;
+    return thread.project_id === projectFilter.projectId;
+  });
   return {
     capabilities: {
       available: true, cli_version: '0.153.4', cli_path: 'codex.exe',
@@ -78,7 +84,7 @@ async function installFixtures(context, mode) {
           await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Codex app server unavailable' }) });
           return;
         }
-        payload = overview(mode, args.query?.archived === true);
+        payload = overview(mode, args.query?.archived === true, args.query);
         break;
       case 'mutate_sessions':
         if (mode.value === 'blocked') {
@@ -137,6 +143,15 @@ async function assertViewport(page, name) {
       await page.getByRole('button', { name: '会话管理', exact: true }).click();
       await page.getByText('修复排行榜结算异常', { exact: true }).waitFor();
       await assertViewport(page, `zh-history-list-${viewport.width}`);
+
+      if (viewport.width === 900) {
+        await page.getByRole('button', { name: /^Alpha 游戏项目/ }).click();
+        await page.getByText('找到 2 个会话', { exact: true }).waitFor();
+        assert.equal(await page.getByText('整理发布检查清单', { exact: true }).count(), 0);
+        await assertViewport(page, 'zh-history-project-filter-900');
+        await page.getByRole('button', { name: /^全部会话/ }).click();
+        await page.getByText('找到 3 个会话', { exact: true }).waitFor();
+      }
 
       await page.getByRole('button', { name: '修复排行榜结算异常的更多操作', exact: true }).click();
       await page.getByRole('button', { name: '永久删除', exact: true }).click();
