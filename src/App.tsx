@@ -6,7 +6,7 @@ import { useDesktopReopen } from "./hooks/useDesktopReopen";
 import { SettingsModal } from "./components/SettingsModal";
 import { finishForceClose, type DesktopReopenPreference } from "./lib/desktopReopen";
 import { useForceCloseCodexProcesses } from "./hooks/useForceCloseCodexProcesses";
-import { AccountCard, AddAccountModal, UpdateChecker } from "./components";
+import { AccountCard, AddAccountModal, SessionManagerPage, UpdateChecker } from "./components";
 import type { AccountWithUsage, CodexProcessInfo, DockDisplayMode, UsageInfo } from "./types";
 import {
   exportFullBackupFile,
@@ -247,6 +247,9 @@ function App() {
   >("deadline_asc");
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
+  const [activePage, setActivePage] = useState<"accounts" | "sessions">("accounts");
+  const canManageHistory = isTauriRuntime()
+    || (import.meta.env.DEV && new URLSearchParams(window.location.search).get("historyFixture") === "1");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCompletingForceClose, setIsCompletingForceClose] = useState(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1386,13 +1389,31 @@ function App() {
         </div>
 
         <div className="max-w-5xl mx-auto px-6 py-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_max-content] md:items-center md:gap-4">
+          <div className={`grid gap-3 md:grid-cols-[minmax(0,1fr)_max-content] md:items-center md:gap-4 ${activePage === "sessions" ? "grid-cols-[minmax(0,1fr)_max-content] items-center gap-4" : "grid-cols-1"}`}>
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
                     Codex Switcher
                   </h1>
+                  <nav className="flex rounded-lg bg-gray-100 p-0.5 dark:bg-gray-800" aria-label={t("Main navigation")}>
+                    <button
+                      type="button"
+                      onClick={() => setActivePage("accounts")}
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${activePage === "accounts" ? "bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-white" : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"}`}
+                    >
+                      {t("Accounts")}
+                    </button>
+                    {canManageHistory && (
+                      <button
+                        type="button"
+                        onClick={() => setActivePage("sessions")}
+                        className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${activePage === "sessions" ? "bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-white" : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"}`}
+                      >
+                        {t("Sessions")}
+                      </button>
+                    )}
+                  </nav>
                   {processInfo && (
                     <div className="inline-flex items-center gap-1">
                       <span
@@ -1441,6 +1462,8 @@ function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0 md:ml-4 md:w-max md:flex-nowrap md:justify-end">
+              {activePage === "accounts" && (
+                <>
               <button
                 onClick={toggleMaskAll}
                 className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 shrink-0"
@@ -1502,6 +1525,8 @@ function App() {
                     <path d="m20 20-3.5-3.5" strokeLinecap="round" />
                   </svg>
                 </button>
+              )}
+                </>
               )}
 
               <div className="relative" ref={navMenuRef}>
@@ -1643,6 +1668,7 @@ function App() {
                   </div>
                 )}
               </div>
+              {activePage === "accounts" && (
               <div className="relative" ref={actionsMenuRef}>
                 <button
                   onClick={() => setIsActionsMenuOpen((prev) => !prev)}
@@ -1704,6 +1730,7 @@ function App() {
                   </div>
                 )}
               </div>
+              )}
             </div>
           </div>
         </div>
@@ -1711,7 +1738,9 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-6 pt-4 pb-8">
-        {loading && accounts.length === 0 ? (
+        {activePage === "sessions" && canManageHistory ? (
+          <SessionManagerPage />
+        ) : loading && accounts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin h-10 w-10 border-2 border-gray-900 dark:border-gray-100 border-t-transparent rounded-full mb-4"></div>
             <p className="text-gray-500 dark:text-gray-400">{t("Loading accounts...")}</p>

@@ -68,6 +68,8 @@ struct UnixProcessSnapshot {
 }
 
 const CODEX_RUNNING_SWITCH_BLOCKED_PREFIX: &str = "Cannot switch accounts while ";
+pub(crate) const CODEX_RUNNING_HISTORY_BLOCKED_PREFIX: &str =
+    "Cannot manage Codex history while ";
 
 /// Check for running Codex processes
 #[tauri::command]
@@ -97,8 +99,66 @@ pub(crate) fn ensure_codex_not_running() -> Result<(), String> {
     ))
 }
 
+pub(crate) fn ensure_codex_not_running_for_history() -> Result<(), String> {
+    ensure_codex_not_running_for_history_except(None)
+}
+
+pub(crate) fn ensure_codex_not_running_for_history_except(
+    excluded_pid: Option<u32>,
+) -> Result<(), String> {
+    let (pids, writer_count) =
+        find_codex_history_processes(excluded_pid).map_err(|e| e.to_string())?;
+
+    if writer_count == 0 {
+        return Ok(());
+    }
+
+    if pids.is_empty() {
+        return Err(format!(
+            "{CODEX_RUNNING_HISTORY_BLOCKED_PREFIX}background Codex processes may be writing session records. Close them and retry."
+        ));
+    }
+
+    Err(format!(
+        "{CODEX_RUNNING_HISTORY_BLOCKED_PREFIX}{} Codex process{} running",
+        pids.len(),
+        if pids.len() == 1 { " is" } else { "es are" }
+    ))
+}
+
+fn find_codex_history_processes(excluded_pid: Option<u32>) -> anyhow::Result<(Vec<u32>, usize)> {
+    #[cfg(windows)]
+    {
+        let processes = read_windows_codex_processes()?;
+        let (mut active_pids, _) = classify_windows_codex_processes(&processes);
+        active_pids.retain(|pid| Some(*pid) != excluded_pid);
+        let writer_count = processes
+            .iter()
+            .filter(|process| Some(process.process_id) != excluded_pid)
+            .filter(|process| is_windows_codex_history_writer(process))
+            .map(|process| process.process_id)
+            .collect::<HashSet<_>>()
+            .len();
+        return Ok((active_pids, writer_count));
+    }
+
+    #[cfg(unix)]
+    {
+        let (active_pids, background_count) = find_codex_processes_excluding(excluded_pid)?;
+        let writer_count = active_pids.len() + background_count;
+        return Ok((active_pids, writer_count));
+    }
+
+    #[allow(unreachable_code)]
+    Ok((Vec::new(), 0))
+}
+
 pub(crate) fn is_codex_running_switch_block(error: &str) -> bool {
     error.starts_with(CODEX_RUNNING_SWITCH_BLOCKED_PREFIX)
+}
+
+pub(crate) fn is_codex_running_history_block(error: &str) -> bool {
+    error.starts_with(CODEX_RUNNING_HISTORY_BLOCKED_PREFIX)
 }
 
 /// Force-close active Codex processes that currently block account switching.
@@ -378,6 +438,10 @@ fn process_exists(pid: u32) -> bool {
 
 /// Find all running codex processes. Returns (active_pids, background_count)
 fn find_codex_processes() -> anyhow::Result<(Vec<u32>, usize)> {
+    find_codex_processes_excluding(None)
+}
+
+fn find_codex_processes_excluding(excluded_pid: Option<u32>) -> anyhow::Result<(Vec<u32>, usize)> {
     #[cfg(unix)]
     {
         let mut pids = Vec::new();
@@ -442,7 +506,10 @@ fn find_codex_processes() -> anyhow::Result<(Vec<u32>, usize)> {
                     continue;
                 }
 
-                if pid == std::process::id() || pids.contains(&pid) {
+                if pid == std::process::id()
+                    || Some(pid) == excluded_pid
+                    || pids.contains(&pid)
+                {
                     continue;
                 }
 
@@ -472,6 +539,7 @@ fn find_codex_processes() -> anyhow::Result<(Vec<u32>, usize)> {
 
     #[cfg(windows)]
     {
+        let _ = excluded_pid;
         return find_windows_codex_processes();
     }
 
@@ -700,6 +768,19 @@ fn is_windows_codex_root_process(process: &WindowsCodexProcess) -> bool {
 }
 
 #[cfg(any(windows, test))]
+fn is_windows_codex_history_writer(process: &WindowsCodexProcess) -> bool {
+    if is_windows_codex_root_process(process) {
+        return true;
+    }
+
+    let name = process.name.to_ascii_lowercase();
+    let command = normalize_windows_path(&process.command_line);
+    name == "codex.exe"
+        && !command.contains("codex-switcher")
+        && !command.contains("--type=")
+}
+
+#[cfg(any(windows, test))]
 fn is_windows_codex_package_chatgpt_process(process: &WindowsCodexProcess) -> bool {
     let executable_path = process.executable_path.trim();
     if !executable_path.is_empty() {
@@ -759,8 +840,8 @@ mod tests {
     #[cfg(unix)]
     use super::is_macos_codex_desktop_process;
     use super::{
-        classify_windows_codex_processes, is_windows_codex_root_process,
-        parse_windows_codex_processes, WindowsCodexProcess,
+        classify_windows_codex_processes, is_windows_codex_history_writer,
+        is_windows_codex_root_process, parse_windows_codex_processes, WindowsCodexProcess,
     };
 
     fn windows_process(
@@ -970,6 +1051,48 @@ mod tests {
             &lookalike_outside_windows_apps
         ));
         assert!(!is_windows_codex_root_process(&spoofed_argument));
+    }
+
+    #[test]
+    fn history_writer_detection_includes_backends_plugins_and_standalone_cli() {
+        let processes = [
+            windows_process(
+                "Codex.exe",
+                30,
+                20,
+                r"C:\Program Files\WindowsApps\OpenAI.Codex_26.707.3748.0_x64__2p2nqsd0c76g0\app\resources\codex.exe",
+                r#""C:\Program Files\WindowsApps\OpenAI.Codex_26.707.3748.0_x64__2p2nqsd0c76g0\app\resources\codex.exe" app-server"#,
+                "",
+            ),
+            windows_process(
+                "Codex.exe",
+                31,
+                1,
+                r"C:\Users\test\.vscode\extensions\openai.chatgpt\bin\codex.exe",
+                r#""C:\Users\test\.vscode\extensions\openai.chatgpt\bin\codex.exe" app-server"#,
+                "",
+            ),
+            windows_process(
+                "Codex.exe",
+                32,
+                1,
+                r"C:\Tools\codex.exe",
+                r#"C:\Tools\codex.exe"#,
+                "",
+            ),
+        ];
+
+        assert!(processes.iter().all(is_windows_codex_history_writer));
+
+        let renderer = windows_process(
+            "Codex.exe",
+            33,
+            20,
+            r"C:\Program Files\Codex\Codex.exe",
+            r#""C:\Program Files\Codex\Codex.exe" --type=renderer"#,
+            "",
+        );
+        assert!(!is_windows_codex_history_writer(&renderer));
     }
 
     #[test]

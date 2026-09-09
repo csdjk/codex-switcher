@@ -5,6 +5,7 @@ pub mod api;
 pub mod app_menu;
 pub mod auth;
 pub mod commands;
+pub mod history;
 #[cfg(desktop)]
 mod language;
 #[cfg(target_os = "windows")]
@@ -20,7 +21,8 @@ use commands::{
     export_accounts_slim_text, get_account_usage_stats, get_active_account_info,
     get_dock_display_mode, get_masked_account_ids, get_usage, hide_tray_window,
     import_accounts_full_encrypted_file, import_accounts_slim_text, kill_codex_processes,
-    list_accounts, open_main_window, quit_app, refresh_account_metadata,
+    list_accounts, list_history_overview, mutate_project, mutate_sessions, open_main_window,
+    quit_app, refresh_account_metadata,
     refresh_all_accounts_usage, rename_account, report_usage, set_dock_display_mode,
     set_masked_account_ids, start_login, switch_account, warmup_account, warmup_all_accounts,
 };
@@ -107,6 +109,11 @@ pub fn run() {
             set_dock_display_mode,
             complete_close_behavior,
             ack_close_behavior_prompt,
+            // Codex project and session history
+            commands::get_history_capabilities,
+            list_history_overview,
+            mutate_sessions,
+            mutate_project,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

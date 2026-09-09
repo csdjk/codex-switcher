@@ -130,3 +130,96 @@ export interface ImportAccountsSummary {
   imported_count: number;
   skipped_count: number;
 }
+
+export interface HistoryCapabilities {
+  available: boolean;
+  cli_version: string;
+  cli_path: string;
+  codex_home: string;
+  project_management: boolean;
+  minimum_cli_version: string;
+}
+
+export type HistoryProjectFilter =
+  | { kind: "all" }
+  | { kind: "unassigned" }
+  | { kind: "project"; projectId: string };
+
+export interface HistoryListQuery {
+  archived: boolean;
+  cursor?: string | null;
+  limit?: number;
+  searchTerm?: string | null;
+  projectFilter: HistoryProjectFilter;
+  sourceKind?: string | null;
+  status?: string | null;
+  updatedAfter?: number | null;
+}
+
+export interface HistoryTotals {
+  projects: number;
+  active_threads: number;
+  archived_threads: number;
+}
+
+export interface HistoryProjectSummary {
+  id: string;
+  name: string;
+  roots: string[];
+  active_thread_count: number;
+  archived_thread_count: number;
+  recency_at: number | null;
+}
+
+export interface HistoryThreadSummary {
+  id: string;
+  title: string;
+  cwd: string;
+  project_id: string | null;
+  source_kind: string;
+  status: string;
+  active_flags: string[];
+  created_at: number;
+  updated_at: number;
+  recency_at: number;
+  archived: boolean;
+  descendant_count: number;
+  can_mutate: boolean;
+}
+
+export interface HistoryOverview {
+  capabilities: HistoryCapabilities;
+  totals: HistoryTotals;
+  projects: HistoryProjectSummary[];
+  threads: HistoryThreadSummary[];
+  filtered_count: number;
+  next_cursor: string | null;
+}
+
+export type SessionMutationAction =
+  | { action: "rename"; threadId: string; name: string }
+  | { action: "archive" | "unarchive" | "delete"; threadId: string };
+
+export interface SessionMutationResult {
+  thread_id: string;
+  action: SessionMutationAction["action"];
+  success: boolean;
+  skipped_descendant: boolean;
+  error: string | null;
+}
+
+export interface SessionMutationSummary {
+  total: number;
+  succeeded: number;
+  failed: number;
+  results: SessionMutationResult[];
+  warning?: string | null;
+}
+
+export type ProjectMutationAction = { action: "remove"; projectId: string };
+
+export interface ProjectMutationResult {
+  project_id: string;
+  success: boolean;
+  warning?: string | null;
+}
