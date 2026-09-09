@@ -65,25 +65,17 @@
 
 [下载最新发行版](https://github.com/csdjk/codex-switcher/releases/latest)
 
-请根据系统选择对应文件：
+当前发行版提供 Windows x64 安装包：
 
-- **macOS Apple 芯片**：`Codex.Switcher_*_aarch64.dmg`
-- **macOS Intel 芯片**：`Codex.Switcher_*_x64.dmg`
-- **Windows**：`Codex.Switcher_*_x64-setup.exe` 或 `Codex.Switcher_*_x64_en-US.msi`
-- **Linux Debian/Ubuntu**：`Codex.Switcher_*_amd64.deb`
-- **Linux AppImage**：`Codex.Switcher_*_amd64.AppImage`
-- **Linux RPM**：`Codex.Switcher-*-1.x86_64.rpm`
+- **推荐安装程序**：`Codex.Switcher_*_x64-setup.exe`
+- **MSI 安装包**：`Codex.Switcher_*_x64_en-US.msi`
+- **文件校验值**：`SHA256SUMS.txt`
 
-> **macOS：**当前发行版尚未经过 Apple 公证。如果 macOS 提示应用已损坏，请先将应用移动到 `/Applications`，再移除隔离标记：
->
-> ```bash
-> sudo xattr -dr com.apple.quarantine "/Applications/Codex Switcher.app"
-> open "/Applications/Codex Switcher.app"
-> ```
+macOS 和 Linux 暂未提供预编译安装包，可以按下方步骤从源码构建。
 
 ### 自动更新
 
-Codex Switcher 启动时会检查 GitHub 上的最新发行版。检测到更高版本的已签名更新包后，应用会显示更新提示，并可直接在应用内完成安装。
+当前仓库的发行版尚未配置独立的自动更新签名，请从 [Releases](https://github.com/csdjk/codex-switcher/releases) 页面手动下载新版本。完成签名配置后再恢复应用内自动更新。
 
 ### 从源码构建
 
