@@ -80,9 +80,15 @@ async function installFixtures(context, mode) {
       case 'cancel_login': payload = null; break;
       case 'get_history_capabilities': payload = overview(mode).capabilities; break;
       case 'list_history_overview':
+        mode.overviewRequests = [...(mode.overviewRequests ?? []), args.query];
         if (mode.value === 'error') {
           await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Codex app server unavailable' }) });
           return;
+        }
+        if (mode.nextOverviewDelayMs && args.query?.forceRefresh !== false) {
+          const delayMs = mode.nextOverviewDelayMs;
+          mode.nextOverviewDelayMs = 0;
+          await new Promise(resolve => setTimeout(resolve, delayMs));
         }
         payload = overview(mode, args.query?.archived === true, args.query);
         break;
@@ -142,11 +148,19 @@ async function assertViewport(page, name) {
       await page.goto(`${baseURL}/?historyFixture=1`);
       await page.getByRole('button', { name: '会话管理', exact: true }).click();
       await page.getByText('修复排行榜结算异常', { exact: true }).waitFor();
+      assert.equal(mode.overviewRequests.at(-1).forceRefresh, true);
       await assertViewport(page, `zh-history-list-${viewport.width}`);
 
       if (viewport.width === 900) {
+        mode.nextOverviewDelayMs = 1000;
+        const requestCount = mode.overviewRequests.length;
+        const filterStartedAt = Date.now();
         await page.getByRole('button', { name: /^Alpha 游戏项目/ }).click();
-        await page.getByText('找到 2 个会话', { exact: true }).waitFor();
+        await page.getByText('找到 2 个会话', { exact: true }).waitFor({ timeout: 300 });
+        assert.ok(Date.now() - filterStartedAt < 300, 'project filtering waited for the backend refresh');
+        assert.equal(mode.overviewRequests.length, requestCount + 1);
+        assert.equal(mode.overviewRequests.at(-1).forceRefresh, false);
+        mode.nextOverviewDelayMs = 0;
         assert.equal(await page.getByText('整理发布检查清单', { exact: true }).count(), 0);
         await assertViewport(page, 'zh-history-project-filter-900');
         await page.getByRole('button', { name: /^全部会话/ }).click();
@@ -197,6 +211,7 @@ async function assertViewport(page, name) {
       mode.value = 'empty';
       await page.getByRole('button', { name: '刷新会话', exact: true }).click();
       await page.getByText('暂无会话', { exact: true }).waitFor();
+      assert.equal(mode.overviewRequests.at(-1).forceRefresh, true);
       await assertViewport(page, `zh-history-empty-${viewport.width}`);
 
       mode.value = 'error';

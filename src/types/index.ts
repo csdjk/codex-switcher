@@ -154,6 +154,7 @@ export interface HistoryListQuery {
   sourceKind?: string | null;
   status?: string | null;
   updatedAfter?: number | null;
+  forceRefresh?: boolean;
 }
 
 export interface HistoryTotals {

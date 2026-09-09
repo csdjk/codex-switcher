@@ -14,13 +14,16 @@ export function useCodexHistory(query: HistoryListQuery) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const refreshOnMountRef = useRef(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (forceRefresh = true) => {
     const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
-      const result = await invokeBackend<HistoryOverview>("list_history_overview", { query });
+      const result = await invokeBackend<HistoryOverview>("list_history_overview", {
+        query: { ...query, forceRefresh },
+      });
       if (requestId === requestIdRef.current) setOverview(result);
       return result;
     } catch (caught) {
@@ -34,7 +37,9 @@ export function useCodexHistory(query: HistoryListQuery) {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void load().catch(() => undefined);
+      const forceRefresh = refreshOnMountRef.current;
+      refreshOnMountRef.current = false;
+      void load(forceRefresh).catch(() => undefined);
     }, query.searchTerm ? 250 : 0);
     return () => window.clearTimeout(timer);
   }, [load, query.searchTerm]);

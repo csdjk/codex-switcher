@@ -40,9 +40,14 @@ const ALL_SOURCE_KINDS: [&str; 10] = [
 ];
 
 static HISTORY_OPERATION_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+static HISTORY_SNAPSHOT_CACHE: OnceLock<Mutex<Option<HistorySnapshot>>> = OnceLock::new();
 
 fn operation_lock() -> &'static Mutex<()> {
     HISTORY_OPERATION_LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn snapshot_cache() -> &'static Mutex<Option<HistorySnapshot>> {
+    HISTORY_SNAPSHOT_CACHE.get_or_init(|| Mutex::new(None))
 }
 
 #[cfg(windows)]
@@ -142,6 +147,8 @@ pub struct HistoryListQuery {
     pub status: Option<String>,
     #[serde(default)]
     pub updated_after: Option<i64>,
+    #[serde(default)]
+    pub force_refresh: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -291,6 +298,26 @@ pub struct CodexHistoryManager {
     codex_home_override: Option<PathBuf>,
 }
 
+#[derive(Clone)]
+struct HistorySnapshot {
+    capabilities: HistoryCapabilities,
+    projects: Vec<RawProject>,
+    active_threads: Vec<RawThread>,
+    archived_threads: Vec<RawThread>,
+}
+
+impl HistorySnapshot {
+    fn build_overview(&self, query: HistoryListQuery) -> Result<HistoryOverview, String> {
+        build_overview(
+            self.capabilities.clone(),
+            self.projects.clone(),
+            self.active_threads.clone(),
+            self.archived_threads.clone(),
+            query,
+        )
+    }
+}
+
 impl CodexHistoryManager {
     pub async fn discover() -> Result<Self, String> {
         Self::discover_with_home(None).await
@@ -413,6 +440,12 @@ impl CodexHistoryManager {
 
     pub async fn list_overview(&self, query: HistoryListQuery) -> Result<HistoryOverview, String> {
         let _guard = operation_lock().lock().await;
+        if !query.force_refresh {
+            if let Some(snapshot) = snapshot_cache().lock().await.as_ref().cloned() {
+                return snapshot.build_overview(query);
+            }
+        }
+
         let (mut session, codex_home) = self.connect().await?;
         let result = async {
             let projects = match fetch_projects(&mut session).await {
@@ -423,17 +456,19 @@ impl CodexHistoryManager {
             let active_threads = fetch_threads(&mut session, false).await?;
             let archived_threads = fetch_threads(&mut session, true).await?;
             let project_management = projects.is_some();
-            build_overview(
-                self.capabilities(codex_home, project_management),
-                projects.unwrap_or_default(),
+            Ok(HistorySnapshot {
+                capabilities: self.capabilities(codex_home, project_management),
+                projects: projects.unwrap_or_default(),
                 active_threads,
                 archived_threads,
-                query,
-            )
+            })
         }
         .await;
         let shutdown = session.shutdown().await;
-        merge_session_shutdown(result, shutdown)
+        let snapshot = merge_session_shutdown(result, shutdown)?;
+        let overview = snapshot.build_overview(query)?;
+        *snapshot_cache().lock().await = Some(snapshot);
+        Ok(overview)
     }
 
     pub async fn mutate_sessions(
@@ -551,7 +586,14 @@ impl CodexHistoryManager {
         }
         .await;
         let shutdown = session.shutdown().await;
-        attach_session_shutdown_warning(result, shutdown)
+        let result = attach_session_shutdown_warning(result, shutdown);
+        if result
+            .as_ref()
+            .is_ok_and(|summary| summary.succeeded > 0)
+        {
+            *snapshot_cache().lock().await = None;
+        }
+        result
     }
 
     pub async fn mutate_project(
@@ -594,7 +636,11 @@ impl CodexHistoryManager {
             }
         };
         let shutdown = session.shutdown().await;
-        attach_project_shutdown_warning(result, shutdown)
+        let result = attach_project_shutdown_warning(result, shutdown);
+        if result.is_ok() {
+            *snapshot_cache().lock().await = None;
+        }
+        result
     }
 }
 
@@ -1575,8 +1621,9 @@ async fn execute_session_mutation(
 mod tests {
     use super::{
         ancestor_depth, build_overview, has_selected_ancestor, is_supported_cli_version,
-        matching_response, parse_cli_version, source_kind, source_matches, HistoryCapabilities,
-        HistoryListQuery, HistoryProjectFilter, RawProject, RawProjectRoot, RawThread,
+        matching_response, parse_cli_version, snapshot_cache, source_kind, source_matches,
+        CodexCli, CodexHistoryManager, HistoryCapabilities, HistoryListQuery,
+        HistoryProjectFilter, HistorySnapshot, RawProject, RawProjectRoot, RawThread,
         RawThreadStatus,
     };
     use serde_json::json;
@@ -1616,6 +1663,54 @@ mod tests {
         .unwrap_err();
         assert!(error.contains("Method not found"));
         assert!(error.contains("-32601"));
+    }
+
+    #[tokio::test]
+    async fn overview_reuses_cached_snapshot_for_filter_changes() {
+        let project = RawProject {
+            id: "project-a".into(),
+            name: "Project A".into(),
+            roots: vec![RawProjectRoot {
+                path: "E:/work/project-a".into(),
+            }],
+            recency_at: Some(30),
+        };
+        let mut cached_thread = thread("cached", "Cached task", None, None, 30);
+        cached_thread.cwd = "E:/work/project-a/client".into();
+        *snapshot_cache().lock().await = Some(HistorySnapshot {
+            capabilities: HistoryCapabilities {
+                available: true,
+                cli_version: "0.153.4".into(),
+                cli_path: "codex".into(),
+                codex_home: "C:/codex".into(),
+                project_management: true,
+                minimum_cli_version: "0.153.4".into(),
+            },
+            projects: vec![project],
+            active_threads: vec![cached_thread],
+            archived_threads: Vec::new(),
+        });
+        let manager = CodexHistoryManager {
+            cli: CodexCli {
+                path: "C:/__codex_switcher_missing__/codex.exe".into(),
+                version: "0.153.4".into(),
+            },
+            codex_home_override: None,
+        };
+
+        let result = manager
+            .list_overview(HistoryListQuery {
+                project_filter: HistoryProjectFilter::Project {
+                    project_id: "project-a".into(),
+                },
+                ..HistoryListQuery::default()
+            })
+            .await;
+        *snapshot_cache().lock().await = None;
+
+        let overview = result.unwrap();
+        assert_eq!(overview.filtered_count, 1);
+        assert_eq!(overview.threads[0].id, "cached");
     }
 
     #[test]
