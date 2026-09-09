@@ -5,219 +5,180 @@
 <h1 align="center">Codex Switcher</h1>
 
 <p align="center">
-  A Desktop Application for Managing Multiple OpenAI <a href="https://github.com/openai/codex">Codex</a> Accounts<br>
-  Easily switch between accounts, monitor usage, schedule warm-ups, and stay in control of your quota
+  用于管理多个 OpenAI <a href="https://github.com/openai/codex">Codex</a> 账号的桌面应用<br>
+  轻松切换账号、查看用量、安排预热，并掌握额度状态
 </p>
 
-## Features
+## 功能特性
 
-- **中文 / English** – Switch instantly from **Menu → Settings → Language**. The app follows the system language on first launch, remembers your choice, and synchronizes the main window and tray popup.
-- **Multi-Account Management** – Add, rename, mask, import, export, and manage multiple Codex accounts in one place
-- **Quick Switching** – Switch between accounts from the main window, native tray menu, or tray popup while preserving rotated ChatGPT sessions
-- **Usage Stats** – View account usage stats for OAuth accounts, including lifetime tokens, daily buckets, streaks, activity insights, and top integrations
-- **Manual Reset Credits** – See available manual reset credits beside each account plan badge, with the closest expiry highlighted as it approaches
-- **Automatic Warm-Up** – Warm up one account or all accounts manually, after each 5-hour reset window, or at specific scheduled times of day
-- **System Tray Controls** – Use the tray popup to switch accounts, inspect quota and active-account stats, refresh usage, open the main window, or quit the app
-- **Tray Display Modes** – Choose between the app icon with session percentage, a text-only hourly/weekly percentage display, or a hidden tray icon
-- **macOS Dock Control** – Keep Codex Switcher in the Dock or run it as a menu bar only app, with a first-close prompt and a tray fallback
-- **Rate-Limit Monitoring** – View real-time 5-hour session and weekly usage, reset timing, credits, and subscription expiry
-- **Blocked Switch Recovery** – Detect running Codex sessions and offer a force-close flow before retrying the account switch
-- **Dual Login Mode** – Authenticate with ChatGPT OAuth or import existing `auth.json` files
+- **中文 / English**：在 **菜单 → 设置 → 语言** 中即时切换。应用首次启动时跟随系统语言，记住手动选择，并同步主窗口和托盘弹窗的语言。
+- **多账号管理**：在一个应用中添加、重命名、隐藏、导入、导出和管理多个 Codex 账号。
+- **快速切换账号**：从主窗口、原生托盘菜单或托盘弹窗切换账号，同时保留 ChatGPT 轮换后的最新会话令牌。
+- **使用统计**：查看 OAuth 账号的累计 Token、每日用量、连续使用天数、活跃情况和常用集成等统计信息。
+- **手动重置券**：在账号套餐标记旁查看可用的手动重置次数，并在最近一张重置券即将到期时突出提醒。
+- **自动预热**：支持手动预热单个或全部账号，也可在每个 5 小时窗口重置后自动预热，或按每天的指定时间执行。
+- **系统托盘控制**：通过托盘弹窗切换账号、查看额度和当前账号统计、刷新用量、打开主窗口或退出应用。
+- **Windows 动态额度图标**：任务栏和通知区域图标显示当前账号最紧张额度窗口的剩余百分比，并按额度状态改变颜色。
+- **托盘显示模式**：可显示应用图标和 5 小时剩余额度、仅显示 5 小时/每周额度文字，或隐藏托盘图标。
+- **macOS 程序坞控制**：可让应用保留在程序坞中，或仅在菜单栏运行；首次关闭窗口时会询问行为，并保留托盘入口。
+- **额度监控**：实时查看 5 小时和每周额度的剩余比例、重置时间、余额及订阅期限。
+- **切换受阻恢复**：检测正在运行的 Codex 会话，并在重试账号切换前提供强制关闭流程。
+- **两种登录方式**：支持 ChatGPT OAuth 登录，也可导入已有的 `auth.json` 文件。
 
-## Installation
+## 安装
 
-### Download a Release
+### 下载发行版
 
-The easiest way to install Codex Switcher is from the latest GitHub release:
+最简单的安装方式是从 GitHub 下载最新发行版：
 
-[Download the latest release](https://github.com/Lampese/codex-switcher/releases/latest)
+[下载最新发行版](https://github.com/Lampese/codex-switcher/releases/latest)
 
-Choose the file for your platform:
+请根据系统选择对应文件：
 
-- **macOS Apple Silicon:** `Codex.Switcher_*_aarch64.dmg`
-- **macOS Intel:** `Codex.Switcher_*_x64.dmg`
-- **Windows:** `Codex.Switcher_*_x64-setup.exe` or `Codex.Switcher_*_x64_en-US.msi`
-- **Linux Debian/Ubuntu:** `Codex.Switcher_*_amd64.deb`
-- **Linux AppImage:** `Codex.Switcher_*_amd64.AppImage`
-- **Linux RPM:** `Codex.Switcher-*-1.x86_64.rpm`
+- **macOS Apple 芯片**：`Codex.Switcher_*_aarch64.dmg`
+- **macOS Intel 芯片**：`Codex.Switcher_*_x64.dmg`
+- **Windows**：`Codex.Switcher_*_x64-setup.exe` 或 `Codex.Switcher_*_x64_en-US.msi`
+- **Linux Debian/Ubuntu**：`Codex.Switcher_*_amd64.deb`
+- **Linux AppImage**：`Codex.Switcher_*_amd64.AppImage`
+- **Linux RPM**：`Codex.Switcher-*-1.x86_64.rpm`
 
-> **macOS:** current release builds are not Apple-notarized. If macOS says the
-> app is damaged, move it to `/Applications` and remove the quarantine flag:
+> **macOS：**当前发行版尚未经过 Apple 公证。如果 macOS 提示应用已损坏，请先将应用移动到 `/Applications`，再移除隔离标记：
 >
 > ```bash
 > sudo xattr -dr com.apple.quarantine "/Applications/Codex Switcher.app"
 > open "/Applications/Codex Switcher.app"
 > ```
 
-### Auto Updates
+### 自动更新
 
-Codex Switcher checks the latest GitHub release on startup. When a newer signed
-update package is available, the app shows an update prompt and can install it
-from inside the app.
+Codex Switcher 启动时会检查 GitHub 上的最新发行版。检测到更高版本的已签名更新包后，应用会显示更新提示，并可直接在应用内完成安装。
 
-### Build from Source
+### 从源码构建
 
-#### Prerequisites
+#### 环境要求
 
-- [Node.js](https://nodejs.org/) (v18+)
+- [Node.js](https://nodejs.org/)（v18 或更高版本）
 - [pnpm](https://pnpm.io/)
 - [Rust](https://rustup.rs/)
 
 ```bash
-# Clone the repository
+# 克隆仓库
 git clone https://github.com/Lampese/codex-switcher.git
 cd codex-switcher
 
-# Install dependencies
+# 安装依赖
 pnpm install
 
-# Run in development mode
+# 以开发模式运行
 pnpm tauri dev
 
-# Build for production
+# 构建生产版本
 pnpm tauri build
 ```
 
-> **Windows:** the `pnpm tauri` script runs through a POSIX shell wrapper
-> (`sh ./scripts/tauri.sh`) and will not work in PowerShell/CMD. Use the
-> `tauri:win` script instead: `pnpm tauri:win dev` and `pnpm tauri:win build`.
+> **Windows：**`pnpm tauri` 脚本通过 POSIX Shell 包装器（`sh ./scripts/tauri.sh`）运行，无法直接在 PowerShell 或 CMD 中使用。请改用 `tauri:win` 脚本：`pnpm tauri:win dev` 和 `pnpm tauri:win build`。
 
-The built application will be in `src-tauri/target/release/bundle/`.
+构建产物位于 `src-tauri/target/release/bundle/`。
 
-### Run the Dashboard in a Browser
+### 在浏览器中运行管理面板
 
-You can also serve the built dashboard over HTTP instead of opening the Tauri shell.
+除 Tauri 桌面外壳外，也可以通过 HTTP 提供已构建的管理面板。
 
 ```bash
-# Build the frontend and start the web server on 0.0.0.0:3210
+# 构建前端，并在 0.0.0.0:3210 启动 Web 服务
 pnpm lan
 ```
 
-Optional environment variables:
+可选环境变量：
 
-- `CODEX_SWITCHER_WEB_HOST` to override the bind host
-- `CODEX_SWITCHER_WEB_PORT` to override the port
+- `CODEX_SWITCHER_WEB_HOST`：修改监听地址。
+- `CODEX_SWITCHER_WEB_PORT`：修改监听端口。
 
-The browser dashboard serves the same UI and backend actions through `/api/invoke/*`, which makes it usable over LAN, Tailscale, or a remote host tunnel when you expose the chosen port safely.
+浏览器管理面板通过 `/api/invoke/*` 提供与桌面应用相同的界面和后端操作。安全开放所选端口后，可通过局域网、Tailscale 或远程主机隧道访问。
 
-## Usage and Reset Credits
+## 用量与重置券
 
 ### 中英文切换
 
-打开右上角 **菜单 → 设置 → 语言**，选择「简体中文」或「English」。首次启动时中文系统默认中文，其他系统默认英文；手动选择会保存在当前设备（网页版按浏览器来源保存）。切换立即生效，不会清空正在填写的账号名称。
+打开右上角 **菜单 → 设置 → 语言**，选择「简体中文」或「English」。首次启动时，中文系统默认使用中文，其他系统默认使用英文；手动选择会保存在当前设备上，网页版则按浏览器来源保存。
 
-主界面、账号卡片、用量统计、订阅日期、重置券、弹窗和托盘页面支持双语。原生菜单通过桌面事件同步语言；账号名称、邮箱、插件名称以及服务器返回的原始错误详情保持原样，便于识别和排查。
+切换语言会立即生效，并且不会清空正在填写的账号名称。主界面、账号卡片、用量统计、订阅日期、重置券、弹窗和托盘页面均支持双语。账号名称、邮箱、插件名称以及服务器返回的原始错误详情保持原样，便于识别和排查。
 
 验证记录与复测步骤见 [中英文切换验收](docs/中英文切换验收.md)。
 
-### Usage information
+### 用量信息
 
-Codex Switcher shows two kinds of account usage information:
+Codex Switcher 会显示三类账号使用信息：
 
-- **Rate limits** – the account card shows the current 5-hour and weekly limit
-  windows, remaining percentage, reset timing, credit balance, and subscription
-  expiry when available.
-- **Usage Stats** – ChatGPT OAuth accounts can expand the **Usage
-  Stats** panel to view stats such as lifetime tokens,
-  today, last 7 days, last 30 days, streaks, longest task, token activity,
-  reasoning/activity insights, and most-used integrations. The active account
-  opens this panel by default; other accounts keep it collapsed until needed.
-- **Manual reset credits** – OAuth accounts with available reset credits show a
-  compact badge next to the plan badge. It includes the available count and the
-  closest expiry date, hides zero-count results, and turns amber within 10 days
-  or red within 3 days of expiry.
+- **额度窗口**：账号卡片显示当前 5 小时和每周额度窗口，包括剩余比例、重置时间、余额，以及接口可用时的订阅期限。
+- **使用统计**：ChatGPT OAuth 账号可展开 **使用统计** 面板，查看累计 Token、今日用量、最近 7 天、最近 30 天、连续使用天数、最长任务、Token 趋势、推理与活跃情况，以及最常使用的集成。当前账号默认展开此面板，其他账号按需展开。
+- **手动重置券**：有可用重置券的 OAuth 账号会在套餐标记旁显示紧凑提示，包括可用数量和最近到期日期。数量为零时不显示；距离到期不足 10 天时变为橙色，不足 3 天时变为红色。
 
-The tray popup also includes compact active-account stats for today and
-the last 7 days, while keeping the normal rate-limit refresh flow separate.
+托盘弹窗还会显示当前账号今日和最近 7 天的简要统计，同时与额度刷新流程保持独立。
 
-## Safe Account Switching
+## 安全切换账号
 
-ChatGPT can replace an OAuth refresh token after using it. Once replaced, the
-older token may no longer be accepted. Before Codex Switcher writes another
-account to `~/.codex/auth.json`, it now saves the latest tokens from the account
-that is currently active. Switching back therefore restores the current session
-instead of an older snapshot.
+ChatGPT 在使用 OAuth 刷新令牌后可能会下发新的令牌，旧令牌随后可能失效。在 Codex Switcher 将其他账号写入 `~/.codex/auth.json` 前，会先保存当前账号的最新令牌，因此切回该账号时恢复的是最新会话，而不是旧快照。
 
-Token refreshes and account switches are serialized so a background refresh
-cannot finish late and overwrite the account you just selected. Codex Switcher
-also avoids refreshing the active account while Codex or ChatGPT is running;
-close the running app before switching accounts.
+令牌刷新和账号切换会串行执行，避免后台刷新延迟完成后覆盖刚刚选择的账号。Codex 或 ChatGPT 正在运行时，Codex Switcher 也会避免刷新当前账号；请先关闭正在运行的应用，再切换账号。
 
-If an older Codex Switcher version already saved an invalid refresh token, sign
-in to that account again or remove and re-add it once. An invalidated token
-cannot be recovered locally.
+如果旧版 Codex Switcher 已经保存了无效刷新令牌，请重新登录该账号，或删除后重新添加一次。已经失效的令牌无法在本地恢复。
 
-## macOS Dock and Menu Bar Mode
+## macOS 程序坞与菜单栏模式
 
-On macOS, Codex Switcher can either stay visible in the Dock or live only in the
-menu bar. The first time you close the main window, the app asks which behavior
-you want and lets you choose whether to show that prompt again.
+在 macOS 上，Codex Switcher 可以保留在程序坞中，也可以仅在菜单栏运行。第一次关闭主窗口时，应用会询问希望采用哪种行为，并允许设置以后是否继续显示该提示。
 
-You can change the same setting later from the tray popup or from the native
-tray menu under **Dock Icon**. If you choose **Menu Bar Only**, the app keeps a
-visible tray item so you can always reopen the main window or switch back to
-Dock mode.
+之后可在托盘弹窗或原生托盘菜单的 **程序坞图标** 中修改同一设置。选择 **仅菜单栏** 后，应用仍会保留可见的托盘入口，方便重新打开主窗口或切回程序坞模式。
 
-## Warm-Up
+## 账号预热
 
-A warm-up sends one minimal request to an account so its current usage window
-has activity before you need it.
+预热会向账号发送一次真实的最小模型请求，让当前额度窗口在正式使用前产生一次活动。预热会消耗极少量真实额度，不会增加额度，也不会提升模型速度。
 
-- **Manual** – warm up a single or all accounts, from the main window or tray menu.
-- **Automatic** – when enabled (per account or for all), the app tracks the
-  5-hour window when available and warms it after each reset, as long as the
-  weekly limit isn't exhausted. If only the weekly window is available, it
-  warms once after the weekly reset and automatically returns to the 5-hour
-  schedule if that window reappears.
-- **Timed** – pick specific times of day (e.g. `08:00`, `13:00`, `18:00`) from
-  the **Timed** control in the main window. At each time the app warms all
-  accounts (skipping any whose weekly limit is exhausted), so you control when
-  your 5-hour windows start instead of letting them drift.
+- **手动预热**：从主窗口或托盘菜单立即预热单个或全部账号。
+- **自动预热**：为单个或全部账号启用后，应用会优先跟踪 5 小时窗口，并在每次重置后预热一次，前提是每周额度尚未耗尽。如果只能取得每周窗口，则在每周重置后预热一次；5 小时窗口重新出现后会自动恢复按 5 小时窗口执行。
+- **定时预热**：在主窗口的 **定时** 设置中选择每天的具体时间，例如 `08:00`、`13:00`、`18:00`。到达设定时间后，应用会预热所有符合条件的账号，并跳过每周额度已经耗尽的账号，从而让 5 小时窗口尽量按预期时间开始。
 
-Timed warm-up checks the schedule every 30 seconds, runs each configured minute
-only once per day, and skips missed times if the machine was asleep instead of
-warming accounts late.
+定时预热每 30 秒检查一次计划，同一分钟每天只执行一次。如果电脑在目标时间处于休眠状态，唤醒后会跳过已经错过的时间，不会延迟补发预热请求。
 
-On macOS you can keep the machine awake with the built-in `caffeinate` command,
-which stops automatically when the app quits:
+在 macOS 上，可以使用系统自带的 `caffeinate` 命令保持电脑唤醒；应用退出后，该命令会自动结束：
 
 ```bash
 caffeinate -i -w "$(pgrep -x 'Codex Switcher')"
 ```
 
-## Disclaimer
+## 使用声明
 
-This tool is designed **exclusively for individuals who personally own multiple OpenAI/ChatGPT accounts**. It is intended to help users manage their own accounts more conveniently.
+本工具**仅供个人管理本人拥有的多个 OpenAI/ChatGPT 账号**，目的是让个人账号管理更加方便。
 
-**This tool is NOT intended for:**
+**本工具不用于：**
 
-- Sharing accounts between multiple users
-- Circumventing OpenAI's terms of service
-- Any form of account pooling or credential sharing
+- 多人共享账号。
+- 绕过 OpenAI 的服务条款。
+- 任何形式的账号池或凭据共享。
 
-By using this software, you agree that you are the rightful owner of all accounts you add to the application. The authors are not responsible for any misuse or violations of OpenAI's terms of service.
+使用本软件即表示你确认自己是所添加账号的合法所有者。作者不对滥用本软件或违反 OpenAI 服务条款的行为负责。
 
-## Versioning
+## 版本管理
 
-Use the version bump helper to keep app versions in sync across Tauri, Cargo, and the frontend.
+使用版本更新脚本，可以让 Tauri、Cargo 和前端中的应用版本保持一致。
 
 ```bash
-# Exact version
+# 指定确切版本
 pnpm version:bump 0.2.1
 
-# Semver bumps
+# 按语义化版本递增
 pnpm version:patch
 pnpm version:minor
 pnpm version:major
 
-# Prepare a release commit and tag
-# This prompts for a short release note and runs the version bump first.
+# 创建发行提交和标签
+# 命令会先要求输入简短的发行说明，再更新版本号
 pnpm release patch
 
-# Prepare and push a release
-# The tag stores the release note for the in-app update prompt.
+# 创建并推送发行版本
+# 标签会保存发行说明，供应用内更新提示使用
 pnpm release patch -- --push
 
-# For non-interactive use, pass the note explicitly.
-pnpm release patch -- --push --note "Fixed account switching issues"
+# 非交互环境中可直接传入发行说明
+pnpm release patch -- --push --note "修复账号切换问题"
 ```
