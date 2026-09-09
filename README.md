@@ -63,7 +63,7 @@
 
 最简单的安装方式是从 GitHub 下载最新发行版：
 
-[下载最新发行版](https://github.com/Lampese/codex-switcher/releases/latest)
+[下载最新发行版](https://github.com/csdjk/codex-switcher/releases/latest)
 
 请根据系统选择对应文件：
 
@@ -95,7 +95,7 @@ Codex Switcher 启动时会检查 GitHub 上的最新发行版。检测到更高
 
 ```bash
 # 克隆仓库
-git clone https://github.com/Lampese/codex-switcher.git
+git clone https://github.com/csdjk/codex-switcher.git
 cd codex-switcher
 
 # 安装依赖
