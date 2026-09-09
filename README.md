@@ -9,6 +9,38 @@
   轻松切换账号、查看用量、安排预热，并掌握额度状态
 </p>
 
+## 软件截图
+
+<p align="center">
+  <a href="docs/截图/主界面.png"><img src="docs/截图/主界面.png" alt="Codex Switcher 中文主界面" width="900"></a>
+</p>
+<p align="center"><sub>桌面主界面：账号额度、重置券、预热和使用趋势</sub></p>
+
+<table>
+  <tr>
+    <td width="50%" align="center"><a href="docs/截图/使用统计.png"><img src="docs/截图/使用统计.png" alt="使用统计详情"></a></td>
+    <td width="50%" align="center"><a href="docs/截图/设置.png"><img src="docs/截图/设置.png" alt="中文设置弹窗"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>使用统计详情</sub></td>
+    <td align="center"><sub>语言与账号切换设置</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="docs/截图/托盘.png"><img src="docs/截图/托盘.png" alt="Codex Switcher 托盘弹窗" width="300"></a>
+</p>
+<p align="center"><sub>托盘弹窗：无需打开主窗口即可查看额度和切换账号</sub></p>
+
+<details>
+  <summary>查看移动端浏览器管理面板</summary>
+  <p align="center">
+    <a href="docs/截图/移动端.png"><img src="docs/截图/移动端.png" alt="移动端浏览器管理面板" width="320"></a>
+  </p>
+</details>
+
+> 截图使用脱敏测试账号和隔离数据，不包含真实账号或凭据。点击图片可查看原图。
+
 ## 功能特性
 
 - **中文 / English**：在 **菜单 → 设置 → 语言** 中即时切换。应用首次启动时跟随系统语言，记住手动选择，并同步主窗口和托盘弹窗的语言。
