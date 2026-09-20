@@ -1,190 +1,90 @@
+import { useEffect, useState } from "react";
 import { t } from "../lib/i18n";
-import { useState, useEffect, useCallback } from "react";
-import type { Update } from "@tauri-apps/plugin-updater";
-import { isTauriRuntime } from "../lib/platform";
+import { isTauriRuntime, openExternalUrl } from "../lib/platform";
+import { checkForAppUpdate, UPDATE_REPOSITORY } from "../lib/appUpdates";
+import type { AppRelease } from "../lib/appUpdates";
 
-type UpdateStatus =
-  | { kind: "idle" }
-  | { kind: "checking" }
-  | { kind: "available"; update: Update }
-  | { kind: "downloading"; downloaded: number; total: number | null }
-  | { kind: "ready" }
-  | { kind: "error"; message: string };
-
+/** This fork checks its own Releases and never installs unsigned/upstream builds. */
 export function UpdateChecker() {
-  const [status, setStatus] = useState<UpdateStatus>({ kind: "idle" });
+  const [release, setRelease] = useState<AppRelease | null>(null);
   const [dismissed, setDismissed] = useState(false);
-
-  const checkForUpdate = useCallback(async () => {
-    if (!isTauriRuntime()) return;
-
-    try {
-      setStatus({ kind: "checking" });
-      setDismissed(false);
-      const { check } = await import("@tauri-apps/plugin-updater");
-      const update = await check();
-      if (update) {
-        setStatus({ kind: "available", update });
-      } else {
-        setStatus({ kind: "idle" });
-      }
-    } catch (err) {
-      console.error("Update check failed:", err);
-      setStatus({ kind: "idle" });
-    }
-  }, []);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState(false);
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
-    void checkForUpdate();
-  }, [checkForUpdate]);
+    const controller = new AbortController();
+    let disposed = false;
+    void (async () => {
+      try {
+        // Compare against the actual native application, not a stale web bundle.
+        const { getVersion } = await import("@tauri-apps/api/app");
+        const version = await getVersion();
+        if (disposed) return;
+        const update = await checkForAppUpdate(version, controller.signal);
+        if (!disposed) setRelease(update);
+      } catch (error) {
+        // Startup checks are non-blocking. Offline, timeout and rate-limit errors
+        // must not be shown as 'up to date' or fall back to the original project.
+        if (!disposed) console.warn("Application release check unavailable:", error);
+      }
+    })();
+    return () => {
+      disposed = true;
+      controller.abort();
+    };
+  }, []);
 
-  const handleDownloadAndInstall = async () => {
-    if (status.kind !== "available") return;
-    const { update } = status;
-
+  const handleOpenRelease = async () => {
+    if (!release || opening) return;
+    setOpening(true);
+    setOpenError(false);
     try {
-      if (!isTauriRuntime()) return;
-      let downloaded = 0;
-      let total: number | null = null;
-
-      await update.downloadAndInstall((event) => {
-        switch (event.event) {
-          case "Started":
-            total = event.data.contentLength ?? null;
-            setStatus({ kind: "downloading", downloaded: 0, total });
-            break;
-          case "Progress":
-            downloaded += event.data.chunkLength;
-            setStatus({ kind: "downloading", downloaded, total });
-            break;
-          case "Finished":
-            setStatus({ kind: "ready" });
-            break;
-        }
-      });
-
-      setStatus({ kind: "ready" });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error("Update install failed:", err);
-      setStatus({ kind: "error", message });
+      await openExternalUrl(release.url);
+    } catch (error) {
+      console.error("Could not open application release page:", error);
+      setOpenError(true);
+    } finally {
+      setOpening(false);
     }
   };
 
-  const handleRelaunch = async () => {
-    try {
-      if (!isTauriRuntime()) return;
-      const { relaunch } = await import("@tauri-apps/plugin-process");
-      await relaunch();
-    } catch (err) {
-      console.error("Relaunch failed:", err);
-    }
-  };
-
-  if (!isTauriRuntime()) {
-    return null;
-  }
-
-  if (status.kind === "idle" || status.kind === "checking" || dismissed) {
-    return null;
-  }
-
-  const formatBytes = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+  if (!isTauriRuntime() || !release || dismissed) return null;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-lg w-full px-4"
+      role="status" aria-live="polite" data-testid="app-update-notice">
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-4">
-        {status.kind === "available" && (
-          <div className="flex items-start gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {t("Update available: v")}{status.update.version}
-              </p>
-              {status.update.body && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                  {status.update.body}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => setDismissed(true)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
-              >
-                {t("Later")}
-              </button>
-              <button
-                onClick={handleDownloadAndInstall}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors"
-              >
-                {t("Update")}
-              </button>
-            </div>
-          </div>
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {t("Update available: v")}{release.version}
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-words">
+          {t("Update source: {0}", UPDATE_REPOSITORY)}
+        </p>
+        {release.body && (
+          <p className="text-xs text-gray-600 dark:text-gray-300 mt-2 line-clamp-2 whitespace-pre-line break-words">
+            {release.body}
+          </p>
         )}
-
-        {status.kind === "downloading" && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("Downloading update...")}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {formatBytes(status.downloaded)}
-                {status.total ? ` / ${formatBytes(status.total)}` : ""}
-              </p>
-            </div>
-            <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5">
-              <div
-                className="bg-gray-900 dark:bg-gray-100 h-1.5 rounded-full transition-all duration-300"
-                style={{
-                  width:
-                    status.total && status.total > 0
-                      ? `${Math.min(100, (status.downloaded / status.total) * 100)}%`
-                      : "50%",
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {status.kind === "ready" && (
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {t("Update ready. Restart to apply.")}
-            </p>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => setDismissed(true)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
-              >
-                {t("Later")}
-              </button>
-              <button
-                onClick={handleRelaunch}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors"
-              >
-                {t("Restart")}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {status.kind === "error" && (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-red-600 dark:text-red-300">
-              {t("Update failed:")} {status.message}
-            </p>
-            <button
-              onClick={() => setDismissed(true)}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors shrink-0 ml-2"
-            >
-              {t("Dismiss")}
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-32">
+            {t("Download and install from this repository's release page.")}
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => setDismissed(true)}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors">
+              {t("Later")}
+            </button>
+            <button onClick={handleOpenRelease} disabled={opening}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50">
+              {t("View release")}
             </button>
           </div>
+        </div>
+        {openError && (
+          <p className="text-xs text-red-600 dark:text-red-300 mt-2" role="alert">
+            {t("Could not open the release page. Please try again.")}
+          </p>
         )}
       </div>
     </div>

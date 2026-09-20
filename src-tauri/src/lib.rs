@@ -37,8 +37,8 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
-                app.handle()
-                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+                // UpdateChecker reads this fork's public Releases. The signed
+                // installer stays disabled until this fork has its own keys.
                 app_menu::setup(app.handle())?;
                 tray::setup(app.handle())?;
                 language::setup(app.handle());

@@ -8,6 +8,53 @@ pub use codex_switcher_lib::types;
 
 #[cfg(target_os = "windows")]
 fn main() {
+    // Export the exact production renderer without opening a window, loading
+    // account storage or issuing network requests. Useful for size/theme QA.
+    let mut args = std::env::args_os().skip(1);
+    if let Some(flag) = args.next() {
+        assert_eq!(flag, "--export-dir", "expected --export-dir <directory>");
+        let output = std::path::PathBuf::from(args.next().expect("missing export directory"));
+        assert!(args.next().is_none(), "unexpected extra argument");
+        std::fs::create_dir_all(&output).expect("create preview directory");
+        let mut manifest = Vec::new();
+        for value in [
+            Some(0),
+            Some(1),
+            Some(8),
+            Some(10),
+            Some(11),
+            Some(26),
+            Some(30),
+            Some(31),
+            Some(50),
+            Some(80),
+            Some(93),
+            Some(99),
+            Some(100),
+            None,
+        ] {
+            let image = quota_icon::render(value);
+            let name = value
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "unknown".into());
+            let file = format!("quota-{name}.rgba");
+            std::fs::write(output.join(&file), image.rgba()).expect("write RGBA preview");
+            manifest.push(serde_json::json!({
+                "remaining":value,"file":file,"width":image.width(),"height":image.height()
+            }));
+        }
+        std::fs::write(
+            output.join("manifest.json"),
+            serde_json::to_vec_pretty(&manifest).unwrap(),
+        )
+        .expect("write preview manifest");
+        println!(
+            "Exported {} quota fixtures to {}",
+            manifest.len(),
+            output.display()
+        );
+        return;
+    }
     use tauri::{tray::TrayIconBuilder, Manager};
     tauri::Builder::default()
         .setup(|app| {
