@@ -413,6 +413,13 @@ pub struct UsageInfo {
     pub unlimited_credits: Option<bool>,
     /// Credit balance string (e.g., "$10.50")
     pub credits_balance: Option<String>,
+    /// True when live querying failed and this payload came from the local
+    /// last-successful usage cache.
+    #[serde(default)]
+    pub cached: bool,
+    /// Time this usage snapshot was successfully fetched from the service.
+    #[serde(default)]
+    pub fetched_at: Option<DateTime<Utc>>,
     /// Error message if usage fetch failed
     pub error: Option<String>,
 }
@@ -431,6 +438,8 @@ impl UsageInfo {
             has_credits: None,
             unlimited_credits: None,
             credits_balance: None,
+            cached: false,
+            fetched_at: None,
             error: Some(error),
         }
     }

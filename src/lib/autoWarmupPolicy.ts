@@ -43,7 +43,7 @@ function hasSecondaryWindow(usage: UsageInfo): boolean {
 export function getAutoWarmupWindowKind(
   usage: UsageInfo | undefined
 ): AutoWarmupWindowKind | null {
-  if (!usage || usage.error) return null;
+  if (!usage || usage.error || usage.cached) return null;
   if (hasPrimaryWindow(usage)) return "session";
   if (hasSecondaryWindow(usage)) return "weekly";
   return null;

@@ -26,7 +26,8 @@
     "release:minor": "node scripts/release.mjs minor",
     "release:major": "node scripts/release.mjs major",
     "test:app-updates": "node --experimental-strip-types --test tests/appUpdates.test.ts",
-    "test:app-updates-ui": "node tests/appUpdates.browser.cjs"
+    "test:app-updates-ui": "node tests/appUpdates.browser.cjs",
+    "test:neumorphism-ui": "node tests/neumorphism.browser.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.0",

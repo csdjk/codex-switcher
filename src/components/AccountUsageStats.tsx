@@ -1,3 +1,4 @@
+import { UiIcon } from "./UiIcon";
 import { t, getLocale, localizeMessage } from "../lib/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -6,7 +7,7 @@ import type {
   AccountUsageStats as AccountUsageStatsInfo,
   UsageInfo,
 } from "../types";
-import { invokeBackend } from "../lib/platform";
+import { getAccountStats } from "../lib/accountStats";
 
 interface AccountUsageStatsProps {
   accountId: string;
@@ -146,11 +147,11 @@ function recentDailyBars(daily: AccountDailyUsage[], range: ActivityRange): Acco
 
 function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/50">
+    <div className="neu-stat-tile min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/50">
       <div className="truncate text-[11px] font-medium text-gray-500 dark:text-gray-400">
         {label}
       </div>
-      <div className="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+      <div className="neu-stat-value mt-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
         {value}
       </div>
       {sub && (
@@ -178,7 +179,7 @@ function TokenActivity({ daily }: { daily: AccountDailyUsage[] }) {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white px-3 pb-3 pt-2 dark:border-gray-800 dark:bg-gray-950/40">
+    <div className="neu-chart rounded-lg border border-gray-200 bg-white px-3 pb-3 pt-2 dark:border-gray-800 dark:bg-gray-950/40">
       <div className="mb-2 flex items-center justify-between text-[11px]">
         <span className="font-medium text-gray-600 dark:text-gray-300">{t("Token activity")}</span>
         <div className="flex items-center gap-2">
@@ -201,7 +202,7 @@ function TokenActivity({ daily }: { daily: AccountDailyUsage[] }) {
         </div>
       </div>
       <div
-        className="relative grid h-14 grid-flow-col auto-cols-fr items-end gap-px sm:gap-1"
+        className="neu-chart-bars relative grid h-14 grid-flow-col auto-cols-fr items-end gap-px sm:gap-1"
         onMouseLeave={() => setHoveredDate(null)}
       >
         {bars.map((day) => {
@@ -214,14 +215,20 @@ function TokenActivity({ daily }: { daily: AccountDailyUsage[] }) {
               key={day.date}
               className="relative flex h-14 items-end justify-center"
               onMouseEnter={() => setHoveredDate(day.date)}
+              tabIndex={0}
+              role="img"
+              aria-label={`${formatDateLabel(day.date)}: ${formatTokens(day.tokens)} tokens`}
+              onFocus={() => setHoveredDate(day.date)}
+              onBlur={() => setHoveredDate(null)}
             >
               {isHovered && (
-                <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 min-w-max -translate-x-1/2 rounded-md bg-gray-950 px-2 py-1 text-[11px] text-white shadow-lg dark:bg-gray-100 dark:text-gray-950">
+                <div className="neu-chart-tooltip pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 min-w-max -translate-x-1/2 rounded-md bg-gray-950 px-2 py-1 text-[11px] text-white shadow-lg dark:bg-gray-100 dark:text-gray-950">
                   {formatDateLabel(day.date)} · {formatTokens(day.tokens)}
                 </div>
               )}
               <div
-                className={`w-full ${maxWidth} rounded-t transition-colors ${
+                data-empty={isEmpty}
+                className={`neu-chart-bar w-full ${maxWidth} rounded-t transition-colors ${
                   isEmpty
                     ? "bg-gray-200 dark:bg-gray-800"
                     : "bg-blue-500 hover:bg-blue-400"
@@ -258,7 +265,7 @@ function DetailPanel({
     <details
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
-      className="rounded-lg border border-gray-200 bg-gray-50 transition-colors dark:border-gray-800 dark:bg-gray-950/50"
+      className="neu-details rounded-lg border border-gray-200 bg-gray-50 transition-colors dark:border-gray-800 dark:bg-gray-950/50"
     >
       <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 text-[12px] font-semibold text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-900">
         {t("More usage details")}
@@ -355,10 +362,12 @@ export function AccountUsageStats({
   const [loading, setLoading] = useState(false);
   const requestSeq = useRef(0);
   const backgroundInFlight = useRef(false);
+  const lastLoadedAt = useRef(0);
+  const wasOpen = useRef(false);
   const lastObservedUsage = useRef<UsageInfo | undefined>(usage);
 
-  const loadStats = useCallback(async (background = false) => {
-    if (background && backgroundInFlight.current) return;
+  const loadStats = useCallback(async (background = false, force = false) => {
+    if (backgroundInFlight.current) return;
     const requestId = ++requestSeq.current;
 
     if (!enabled) {
@@ -370,18 +379,14 @@ export function AccountUsageStats({
       return;
     }
 
-    if (background) {
-      backgroundInFlight.current = true;
-    } else {
-      setLoading(true);
-    }
+    backgroundInFlight.current = true;
+    if (!background) setLoading(true);
     try {
-      const next = await invokeBackend<AccountUsageStatsInfo>("get_account_usage_stats", {
-        accountId,
-      });
+      const next = await getAccountStats(accountId, force);
       if (requestId !== requestSeq.current) return;
       if (background && (!next.available || next.error)) return;
       setStats(next);
+      lastLoadedAt.current = Date.now();
       onStatsLoaded?.(next);
     } catch (err) {
       if (background || requestId !== requestSeq.current) return;
@@ -389,9 +394,8 @@ export function AccountUsageStats({
       setStats(next);
       onStatsLoaded?.(next);
     } finally {
-      if (background) {
+      if (requestId === requestSeq.current) {
         backgroundInFlight.current = false;
-      } else if (requestId === requestSeq.current) {
         setLoading(false);
       }
     }
@@ -399,6 +403,9 @@ export function AccountUsageStats({
 
   useEffect(() => {
     requestSeq.current += 1;
+    backgroundInFlight.current = false;
+    lastLoadedAt.current = 0;
+    wasOpen.current = false;
     setStats(null);
     onStatsLoaded?.(null);
     setLoading(false);
@@ -407,8 +414,14 @@ export function AccountUsageStats({
   useEffect(() => {
     const usageChanged = usage !== lastObservedUsage.current;
     lastObservedUsage.current = usage;
-    if (!usageChanged || !enabled || !open || usageLoading || !usage || usage.error) return;
-    void loadStats(true);
+    const justOpened = open && !wasOpen.current;
+    wasOpen.current = open;
+    if (!open) return;
+    if (justOpened && Date.now() - lastLoadedAt.current >= 5 * 60_000) {
+      void loadStats();
+    } else if (usageChanged && enabled && !usageLoading && usage && !usage.error && !usage.cached) {
+      void loadStats(true);
+    }
   }, [enabled, loadStats, open, usage, usageLoading]);
 
   const currentStats = stats?.account_id === accountId ? stats : null;
@@ -420,32 +433,32 @@ export function AccountUsageStats({
   if (!open) return null;
 
   return (
-    <div className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-800">
+    <div className="neu-stats mt-4 border-t border-gray-200 pt-3 dark:border-gray-800">
       <div>
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
             {currentStats?.stats_as_of ? t("Stats as of {0}", currentStats.stats_as_of) : localizeMessage(currentStats?.source ?? "ChatGPT backend")}
             {generatedAt && t(" · updated {0}", generatedAt)}
           </p>
-          <button
-            onClick={() => void loadStats()}
+          <button aria-label={t("Refresh usage stats")}
+            onClick={() => void loadStats(false, true)}
             disabled={loading || !enabled}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="neu-control flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
             title={t("Refresh usage stats")}
           >
-            <span className={loading ? "inline-block animate-spin" : ""}>↻</span>
+            <UiIcon name="refresh" className={loading ? "animate-spin" : ""} />
           </button>
         </div>
 
         {loading && !currentStats ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="neu-stat-grid grid grid-cols-2 gap-2 sm:grid-cols-5">
             {[0, 1, 2, 3, 4].map((item) => (
               <div key={item} className="h-16 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
             ))}
           </div>
         ) : currentStats?.available ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div className="neu-stat-grid grid grid-cols-2 gap-2 sm:grid-cols-5">
               <StatTile label={t("Lifetime")} value={formatTokens(currentStats.summary.lifetime_tokens)} sub="tokens" />
               <StatTile label={t("Today")} value={formatTokens(todayTokens)} sub={t("reported")} />
               <StatTile label={t("Last 7 days")} value={formatTokens(sevenDayTokens)} sub={t("reported")} />

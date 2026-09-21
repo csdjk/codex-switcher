@@ -1,0 +1,301 @@
+{
+  "report": [
+    {
+      "scenario": "progressive refresh and statistics",
+      "passed": true
+    },
+    {
+      "scenario": "cached automatic and timed warm-up",
+      "passed": true
+    },
+    {
+      "name": "zh-light-1000-compact",
+      "width": 1000,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      }
+    },
+    {
+      "name": "zh-light-1000-expanded",
+      "width": 1000,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      }
+    },
+    {
+      "name": "zh-dark-1000-compact",
+      "width": 1000,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      }
+    },
+    {
+      "name": "zh-dark-1000-expanded",
+      "width": 1000,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      }
+    },
+    {
+      "name": "zh-light-320-compact",
+      "width": 320,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      }
+    },
+    {
+      "name": "zh-light-320-expanded",
+      "width": 320,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      }
+    },
+    {
+      "name": "zh-dark-320-compact",
+      "width": 320,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      }
+    },
+    {
+      "name": "zh-dark-320-expanded",
+      "width": 320,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      }
+    },
+    {
+      "name": "zh-light-375-compact",
+      "width": 375,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      }
+    },
+    {
+      "name": "zh-light-375-expanded",
+      "width": 375,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      }
+    },
+    {
+      "name": "zh-dark-375-compact",
+      "width": 375,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      }
+    },
+    {
+      "name": "zh-dark-375-expanded",
+      "width": 375,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      }
+    },
+    {
+      "name": "zh-light-390-compact",
+      "width": 390,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "zh-light-390-expanded",
+      "width": 390,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "zh-dark-390-compact",
+      "width": 390,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "zh-dark-390-expanded",
+      "width": 390,
+      "lang": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "en-light-1000-compact",
+      "width": 1000,
+      "lang": "en-US",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      }
+    },
+    {
+      "name": "en-light-1000-expanded",
+      "width": 1000,
+      "lang": "en-US",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      }
+    },
+    {
+      "name": "en-dark-1000-compact",
+      "width": 1000,
+      "lang": "en-US",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      }
+    },
+    {
+      "name": "en-dark-1000-expanded",
+      "width": 1000,
+      "lang": "en-US",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      }
+    },
+    {
+      "name": "en-light-320-compact",
+      "width": 320,
+      "lang": "en-US",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      }
+    },
+    {
+      "name": "en-light-320-expanded",
+      "width": 320,
+      "lang": "en-US",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      }
+    },
+    {
+      "name": "en-dark-320-compact",
+      "width": 320,
+      "lang": "en-US",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      }
+    },
+    {
+      "name": "en-dark-320-expanded",
+      "width": 320,
+      "lang": "en-US",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      }
+    },
+    {
+      "name": "en-light-375-compact",
+      "width": 375,
+      "lang": "en-US",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      }
+    },
+    {
+      "name": "en-light-375-expanded",
+      "width": 375,
+      "lang": "en-US",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      }
+    },
+    {
+      "name": "en-dark-375-compact",
+      "width": 375,
+      "lang": "en-US",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      }
+    },
+    {
+      "name": "en-dark-375-expanded",
+      "width": 375,
+      "lang": "en-US",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      }
+    },
+    {
+      "name": "en-light-390-compact",
+      "width": 390,
+      "lang": "en-US",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "en-light-390-expanded",
+      "width": 390,
+      "lang": "en-US",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "en-dark-390-compact",
+      "width": 390,
+      "lang": "en-US",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "name": "en-dark-390-expanded",
+      "width": 390,
+      "lang": "en-US",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "runtimeErrors": []
+}

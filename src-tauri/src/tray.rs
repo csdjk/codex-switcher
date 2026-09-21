@@ -350,6 +350,9 @@ fn refresh_windows_quota_icons<R: Runtime>(
         }
     };
     let remaining = crate::quota_icon::remaining(usage.as_ref());
+    let cached = usage
+        .as_ref()
+        .is_some_and(|usage| usage.cached && usage.error.is_none());
     let icon = crate::quota_icon::render(remaining);
     if let Some(window) = app.get_webview_window("main") {
         if let Err(error) = window.set_icon(icon.clone()) {
@@ -382,7 +385,20 @@ fn refresh_windows_quota_icons<R: Runtime>(
             )
         })
         .unwrap_or_default();
-    if let Err(error) = tray.set_tooltip(Some(format!("Codex Switcher\n{description}\n{detail}"))) {
+    let cache_note = if cached {
+        format!(
+            "\n{}",
+            tr(
+                "Cached quota (live refresh unavailable)",
+                "缓存额度（实时刷新暂不可用）"
+            )
+        )
+    } else {
+        String::new()
+    };
+    if let Err(error) = tray.set_tooltip(Some(format!(
+        "Codex Switcher\n{description}\n{detail}{cache_note}"
+    ))) {
         eprintln!("Failed to update Windows quota tooltip: {error}");
     }
 }

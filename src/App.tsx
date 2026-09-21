@@ -1,8 +1,12 @@
+import { compareAccounts } from "./lib/usageModel";
+import { useDialogFocus } from "./hooks/useDialogFocus";
 import { t, useLanguage, pluralSuffix, localizeMessage } from "./lib/i18n";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAccounts } from "./hooks/useAccounts";
 import { useDesktopReopen } from "./hooks/useDesktopReopen";
+import { UiIcon } from "./components/UiIcon";
+import { AccountOverview } from "./components/AccountOverview";
 import { SettingsModal } from "./components/SettingsModal";
 import { finishForceClose, type DesktopReopenPreference } from "./lib/desktopReopen";
 import { useForceCloseCodexProcesses } from "./hooks/useForceCloseCodexProcesses";
@@ -134,20 +138,13 @@ function isLimitFull(usedPercent: number | null | undefined): boolean {
   return usedPercent !== null && usedPercent !== undefined && usedPercent >= LIMIT_FULL_THRESHOLD;
 }
 
-function getPreferredUsedPercent(usage: UsageInfo | undefined): number | null | undefined {
-  return usage?.primary_used_percent ?? usage?.secondary_used_percent;
-}
-
-function getPreferredResetsAt(usage: UsageInfo | undefined): number | null | undefined {
-  return usage?.primary_resets_at ?? usage?.secondary_resets_at;
-}
-
 function getTimedWarmupTargets(accounts: AccountWithUsage[]): AccountWithUsage[] {
   return accounts.filter(
     (account) =>
       account.usage &&
       !account.usageLoading &&
       !account.usage.error &&
+      !account.usage.cached &&
       !isLimitFull(account.usage.secondary_used_percent)
   );
 }
@@ -1022,6 +1019,8 @@ function App() {
       let failed = 0;
       for (const account of targets) {
         try {
+          const usage = await refreshSingleUsage(account.id);
+          if (!getTimedWarmupTargets([{ ...account, usage, usageLoading: false }]).length) continue;
           await warmupAccount(account.id);
           markSuccessfulWarmup(account.id, warmedAt);
           warmed += 1;
@@ -1041,7 +1040,7 @@ function App() {
     } finally {
       setTimedWarmupRunning(false);
     }
-  }, [markSuccessfulWarmup, showWarmupToast, warmupAccount]);
+  }, [markSuccessfulWarmup, refreshSingleUsage, showWarmupToast, warmupAccount]);
 
   useEffect(() => {
     if (!timedWarmupEnabled || timedWarmupTimes.length === 0) return;
@@ -1231,89 +1230,10 @@ function App() {
     ? t("Force close and switch account")
     : t("Force close running Codex processes");
 
-  const sortedOtherAccounts = useMemo(() => {
-    const getResetDeadline = (resetAt: number | null | undefined) =>
-      resetAt ?? Number.POSITIVE_INFINITY;
-
-    const getSubscriptionDeadline = (expiresAt: string | null | undefined) => {
-      if (!expiresAt) return null;
-      const timestamp = new Date(expiresAt).getTime();
-      return Number.isNaN(timestamp) ? null : timestamp;
-    };
-
-    const compareOptionalNumber = (
-      aValue: number | null,
-      bValue: number | null,
-      direction: "asc" | "desc"
-    ) => {
-      if (aValue === null && bValue === null) return 0;
-      if (aValue === null) return 1;
-      if (bValue === null) return -1;
-      return direction === "asc" ? aValue - bValue : bValue - aValue;
-    };
-
-    const getRemainingPercent = (usedPercent: number | null | undefined) => {
-      if (usedPercent === null || usedPercent === undefined) {
-        return Number.NEGATIVE_INFINITY;
-      }
-      return Math.max(0, 100 - usedPercent);
-    };
-
-    return [...otherAccounts].sort((a, b) => {
-      if (
-        otherAccountsSort === "subscription_asc" ||
-        otherAccountsSort === "subscription_desc"
-      ) {
-        const subscriptionDiff = compareOptionalNumber(
-          getSubscriptionDeadline(a.subscription_expires_at),
-          getSubscriptionDeadline(b.subscription_expires_at),
-          otherAccountsSort === "subscription_asc" ? "asc" : "desc"
-        );
-        if (subscriptionDiff !== 0) return subscriptionDiff;
-
-        const deadlineDiff =
-          getResetDeadline(getPreferredResetsAt(a.usage)) -
-          getResetDeadline(getPreferredResetsAt(b.usage));
-        if (deadlineDiff !== 0) return deadlineDiff;
-
-        const remainingDiff =
-          getRemainingPercent(getPreferredUsedPercent(b.usage)) -
-          getRemainingPercent(getPreferredUsedPercent(a.usage));
-        if (remainingDiff !== 0) return remainingDiff;
-
-        return a.name.localeCompare(b.name);
-      }
-
-      if (otherAccountsSort === "deadline_asc" || otherAccountsSort === "deadline_desc") {
-        const deadlineDiff =
-          getResetDeadline(getPreferredResetsAt(a.usage)) -
-          getResetDeadline(getPreferredResetsAt(b.usage));
-        if (deadlineDiff !== 0) {
-          return otherAccountsSort === "deadline_asc" ? deadlineDiff : -deadlineDiff;
-        }
-        const remainingDiff =
-          getRemainingPercent(getPreferredUsedPercent(b.usage)) -
-          getRemainingPercent(getPreferredUsedPercent(a.usage));
-        if (remainingDiff !== 0) return remainingDiff;
-        return a.name.localeCompare(b.name);
-      }
-
-      const remainingDiff =
-        getRemainingPercent(getPreferredUsedPercent(b.usage)) -
-        getRemainingPercent(getPreferredUsedPercent(a.usage));
-      if (otherAccountsSort === "remaining_desc" && remainingDiff !== 0) {
-        return remainingDiff;
-      }
-      if (otherAccountsSort === "remaining_asc" && remainingDiff !== 0) {
-        return -remainingDiff;
-      }
-      const deadlineDiff =
-        getResetDeadline(getPreferredResetsAt(a.usage)) -
-        getResetDeadline(getPreferredResetsAt(b.usage));
-      if (deadlineDiff !== 0) return deadlineDiff;
-      return a.name.localeCompare(b.name);
-    });
-  }, [otherAccounts, otherAccountsSort]);
+  const sortedOtherAccounts = useMemo(
+    () => [...otherAccounts].sort((a, b) => compareAccounts(a, b, otherAccountsSort)),
+    [otherAccounts, otherAccountsSort]
+  );
 
   const normalizedAccountSearchQuery = isAccountSearchEnabled
     ? accountSearchQuery.trim().toLowerCase()
@@ -1333,10 +1253,20 @@ function App() {
     !hasMatchingActiveAccount &&
     visibleOtherAccounts.length === 0;
 
+  const forceDialogRef = useDialogFocus(forceCloseConfirmOpen, () => {
+    if (!isForceClosingCodex) { setPendingSwitchAccountId(null); setForceCloseConfirmOpen(false); }
+  });
+  const closeDialogRef = useDialogFocus(closeBehaviorPromptOpen, () => {
+    if (!isCompletingCloseBehavior) setCloseBehaviorPromptOpen(false);
+  });
+  const configDialogRef = useDialogFocus(isConfigModalOpen, () => {
+    if (!isImportingSlim) setIsConfigModalOpen(false);
+  });
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
-      <header className="sticky top-0 z-40 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex h-9 items-center bg-white px-3 dark:bg-gray-900">
+    <div className="neu-app min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+      <header className="neu-header sticky top-0 z-40 border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <div className="neu-windowbar flex h-9 items-center bg-white px-3 dark:bg-gray-900">
           <div
             onMouseDown={handleTitlebarDrag}
             onDoubleClick={handleTitlebarDoubleClick}
@@ -1344,22 +1274,22 @@ function App() {
           />
           {appWindow && !isMacOs && (
             <div className="flex items-center gap-1">
-              <button
+              <button aria-label={t("Minimize")}
                 onClick={() => {
                   void appWindow.minimize();
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                className="neu-control flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
                 title={t("Minimize")}
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path d="M5 12h14" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
-              <button
+              <button aria-label={isWindowMaximized ? t("Restore") : t("Maximize")}
                 onClick={() => {
                   void appWindow.toggleMaximize();
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                className="neu-control flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
                 title={isWindowMaximized ? t("Restore") : t("Maximize")}
               >
                 {isWindowMaximized ? (
@@ -1373,11 +1303,11 @@ function App() {
                   </svg>
                 )}
               </button>
-              <button
+              <button aria-label={t("Close")}
                 onClick={() => {
                   void appWindow.close();
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-red-500 hover:text-white dark:text-gray-400 dark:hover:bg-red-500 dark:hover:text-white"
+                className="neu-control flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-red-500 hover:text-white dark:text-gray-400 dark:hover:bg-red-500 dark:hover:text-white"
                 title={t("Close")}
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -1388,19 +1318,20 @@ function App() {
           )}
         </div>
 
-        <div className="max-w-5xl mx-auto px-6 py-4">
-          <div className={`grid gap-3 md:grid-cols-[minmax(0,1fr)_max-content] md:items-center md:gap-4 ${activePage === "sessions" ? "grid-cols-[minmax(0,1fr)_max-content] items-center gap-4" : "grid-cols-1"}`}>
+        <div className="neu-toolbar max-w-5xl mx-auto px-6 py-4">
+          <div className={`neu-toolbar-grid grid gap-3 md:grid-cols-[minmax(0,1fr)_max-content] md:items-center md:gap-4 ${activePage === "sessions" ? "grid-cols-[minmax(0,1fr)_max-content] items-center gap-4" : "grid-cols-1"}`}>
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
-                    Codex Switcher
-                  </h1>
-                  <nav className="flex rounded-lg bg-gray-100 p-0.5 dark:bg-gray-800" aria-label={t("Main navigation")}>
+                <div className="neu-brand-line flex items-center gap-2 flex-wrap">
+                  <div className="neu-brand-lockup"><span className="neu-brand-symbol"><UiIcon name="layers" /></span>
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Codex Switcher</h1>
+                  </div>
+                  <nav className="neu-segmented flex rounded-lg bg-gray-100 p-0.5 dark:bg-gray-800" aria-label={t("Main navigation")}>
                     <button
                       type="button"
                       onClick={() => setActivePage("accounts")}
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${activePage === "accounts" ? "bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-white" : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"}`}
+                      aria-current={activePage === "accounts" ? "page" : undefined}
+                      className={`neu-control rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${activePage === "accounts" ? "bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-white" : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"}`}
                     >
                       {t("Accounts")}
                     </button>
@@ -1408,14 +1339,15 @@ function App() {
                       <button
                         type="button"
                         onClick={() => setActivePage("sessions")}
-                        className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${activePage === "sessions" ? "bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-white" : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"}`}
+                        aria-current={activePage === "sessions" ? "page" : undefined}
+                        className={`neu-control rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${activePage === "sessions" ? "bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-white" : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"}`}
                       >
                         {t("Sessions")}
                       </button>
                     )}
                   </nav>
                   {processInfo && (
-                    <div className="inline-flex items-center gap-1">
+                    <div className="neu-process-status inline-flex items-center gap-1">
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs border ${hasRunningProcesses
                             ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
@@ -1439,7 +1371,7 @@ function App() {
                             setForceCloseConfirmOpen(true);
                           }}
                           disabled={isForceClosingCodex}
-                          className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30"
+                          className="neu-control inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30"
                           title={t("Force close running Codex processes")}
                         >
                           {t("Force close")}
@@ -1451,7 +1383,7 @@ function App() {
                     <button
                       onClick={handleOpenCodexApp}
                       disabled={isOpeningCodex || isCompletingForceClose || switchingId !== null}
-                      className="inline-flex items-center rounded-md border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300 dark:hover:bg-green-900/30"
+                      className="neu-control inline-flex items-center rounded-md border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:opacity-50 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300 dark:hover:bg-green-900/30"
                       title={t("Open Codex app")}
                     >
                       {isOpeningCodex ? t("Opening...") : t("Open Codex")}
@@ -1461,12 +1393,12 @@ function App() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0 md:ml-4 md:w-max md:flex-nowrap md:justify-end">
+            <div className="neu-toolbar-actions flex flex-wrap items-center gap-2 shrink-0 md:ml-4 md:w-max md:flex-nowrap md:justify-end">
               {activePage === "accounts" && (
                 <>
-              <button
+              <button aria-label={allMasked ? t("Show all account names and emails") : t("Hide all account names and emails")}
                 onClick={toggleMaskAll}
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 shrink-0"
+                className="neu-control flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 shrink-0"
                 title={allMasked ? t("Show all account names and emails") : t("Hide all account names and emails")}
               >
                 {allMasked ? (
@@ -1485,35 +1417,35 @@ function App() {
                   </svg>
                 )}
               </button>
-              <button
+              <button aria-label={isRefreshing ? t("Refreshing all usage") : t("Refresh all usage")}
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 shrink-0"
+                className="neu-control flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 shrink-0"
                 title={isRefreshing ? t("Refreshing all usage") : t("Refresh all usage")}
               >
-                <span className={isRefreshing ? "animate-spin inline-block" : ""}>↻</span>
+                <UiIcon name="refresh" className={isRefreshing ? "animate-spin" : ""} />
               </button>
-              <button
+              <button aria-label={isWarmingAll ? t("Warming up all accounts") : t("Warm up all accounts")}
                 onClick={() => void handleWarmupAll()}
                 disabled={isWarmingAll || accounts.length === 0}
-                className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors disabled:opacity-50 shrink-0 ${
+                className={`neu-control flex h-10 w-10 items-center justify-center rounded-lg transition-colors disabled:opacity-50 shrink-0 ${
                   isWarmingAll
                     ? "bg-amber-100 text-amber-500 dark:bg-amber-900/30 dark:text-amber-300"
                     : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:hover:bg-amber-900/40"
                 }`}
                 title={isWarmingAll ? t("Warming up all accounts") : t("Warm up all accounts")}
               >
-                <span className={isWarmingAll ? "animate-pulse" : ""}>⚡</span>
+                <UiIcon name="bolt" className={isWarmingAll ? "animate-pulse" : ""} />
               </button>
               {isAccountSearchEnabled && (
-                <button
+                <button aria-label={isAccountSearchOpen ? t("Hide account search") : t("Search accounts")}
                   onClick={() => {
                     if (isAccountSearchOpen) {
                       setAccountSearchQuery("");
                     }
                     setIsAccountSearchOpen((prev) => !prev);
                   }}
-                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors shrink-0 ${
+                  className={`neu-control flex h-10 w-10 items-center justify-center rounded-lg transition-colors shrink-0 ${
                     isAccountSearchOpen
                       ? "bg-gray-900 text-white hover:bg-gray-800 dark:bg-black dark:text-white dark:hover:bg-neutral-900"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
@@ -1529,17 +1461,29 @@ function App() {
                 </>
               )}
 
+              <button
+                type="button"
+                onClick={() => setThemeMode((prev) => (prev === "dark" ? "light" : "dark"))}
+                className="neu-control flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors"
+                title={themeMode === "dark" ? t("Switch to light theme") : t("Switch to dark theme")}
+                aria-label={themeMode === "dark" ? t("Switch to light theme") : t("Switch to dark theme")}
+                aria-pressed={themeMode === "dark"}
+              >
+                <UiIcon name={themeMode === "dark" ? "sun" : "moon"} />
+              </button>
+
               <div className="relative" ref={navMenuRef}>
-                <button
+                <button aria-label={t("Menu")}
                   onClick={() => {
                     setIsTimedWarmupOpen(false);
                     setIsNavMenuOpen((prev) => !prev);
                   }}
-                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors shrink-0 ${
+                  className={`neu-control flex h-10 w-10 items-center justify-center rounded-lg transition-colors shrink-0 ${
                     isNavMenuOpen
                       ? "bg-gray-900 text-white hover:bg-gray-800 dark:bg-black dark:text-white dark:hover:bg-neutral-900"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                   }`}
+                  data-neu-trigger="settings"
                   title={t("Menu")}
                 >
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
@@ -1549,13 +1493,13 @@ function App() {
                   </svg>
                 </button>
                 {isNavMenuOpen && (
-                  <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-2 text-gray-700 shadow-xl dark:border-neutral-800 dark:bg-black dark:text-white">
+                  <div className="neu-popover absolute right-0 z-50 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-2 text-gray-700 shadow-xl dark:border-neutral-800 dark:bg-black dark:text-white">
                     <button
                       onClick={() => {
                         setIsNavMenuOpen(false);
                         setIsSettingsOpen(true);
                       }}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-white dark:hover:bg-neutral-900"
+                      className="neu-control flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-white dark:hover:bg-neutral-900"
                     >
                       {t("Settings")}
                     </button>
@@ -1565,7 +1509,7 @@ function App() {
                         setAutoWarmupAllEnabled((prev) => !prev);
                       }}
                       disabled={accounts.length === 0}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-white dark:hover:bg-neutral-900"
+                      className="neu-control flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-white dark:hover:bg-neutral-900"
                     >
                       <span>{t("Auto Warm Up")}</span>
                       <span
@@ -1583,7 +1527,7 @@ function App() {
                         setIsNavMenuOpen(false);
                         setIsTimedWarmupOpen((prev) => !prev);
                       }}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-white dark:hover:bg-neutral-900"
+                      className="neu-control flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-white dark:hover:bg-neutral-900"
                     >
                       <span>{t("Timer")}</span>
                       <span
@@ -1601,7 +1545,7 @@ function App() {
                         setIsNavMenuOpen(false);
                         setThemeMode((prev) => (prev === "dark" ? "light" : "dark"));
                       }}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-white dark:hover:bg-neutral-900"
+                      className="neu-control flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-white dark:hover:bg-neutral-900"
                     >
                       <span>{t("Appearance")}</span>
                       <span className="text-[11px] text-gray-400 dark:text-gray-500">
@@ -1611,7 +1555,7 @@ function App() {
                   </div>
                 )}
                 {isTimedWarmupOpen && (
-                  <div className="absolute right-0 z-20 mt-2 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                  <div className="neu-popover absolute right-0 z-20 mt-2 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900">
                     <label className="flex items-center justify-between text-sm font-medium text-gray-800 dark:text-gray-100">
                       <span>{t("Timed warm-up")}</span>
                       <input
@@ -1635,13 +1579,11 @@ function App() {
                             <span className="font-mono text-gray-800 dark:text-gray-100">
                               {time}
                             </span>
-                            <button
+                            <button aria-label={t("Remove {0}", time)}
                               onClick={() => handleRemoveTimedWarmupTime(time)}
-                              className="text-gray-400 transition-colors hover:text-red-500"
+                              className="neu-control text-gray-400 transition-colors hover:text-red-500"
                               title={t("Remove {0}", time)}
-                            >
-                              ✕
-                            </button>
+                            ><UiIcon name="close" /></button>
                           </div>
                         ))
                       )}
@@ -1660,7 +1602,7 @@ function App() {
                       <button
                         onClick={handleAddTimedWarmupTime}
                         disabled={!timedWarmupDraft}
-                        className="h-8 rounded-md bg-gray-900 px-3 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50 dark:bg-black dark:hover:bg-neutral-900"
+                        className="neu-control h-8 rounded-md bg-gray-900 px-3 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50 dark:bg-black dark:hover:bg-neutral-900"
                       >
                         {t("Add")}
                       </button>
@@ -1671,19 +1613,20 @@ function App() {
               {activePage === "accounts" && (
               <div className="relative" ref={actionsMenuRef}>
                 <button
+                  data-neu-trigger="accounts"
                   onClick={() => setIsActionsMenuOpen((prev) => !prev)}
-                  className="h-10 px-4 py-2 text-sm font-medium rounded-lg bg-gray-900 text-white transition-colors hover:bg-gray-800 dark:bg-black dark:hover:bg-neutral-900 shrink-0 whitespace-nowrap"
+                  className="neu-control h-10 px-4 py-2 text-sm font-medium rounded-lg bg-gray-900 text-white transition-colors hover:bg-gray-800 dark:bg-black dark:hover:bg-neutral-900 shrink-0 whitespace-nowrap"
                 >
                   {t("Account ▾")}
                 </button>
                 {isActionsMenuOpen && (
-                  <div className="absolute right-0 z-50 mt-2 w-56 rounded-xl border border-gray-200 bg-white p-2 text-gray-700 shadow-xl dark:border-neutral-800 dark:bg-black dark:text-white">
+                  <div className="neu-popover absolute right-0 z-50 mt-2 w-56 rounded-xl border border-gray-200 bg-white p-2 text-gray-700 shadow-xl dark:border-neutral-800 dark:bg-black dark:text-white">
                     <button
                       onClick={() => {
                         setIsActionsMenuOpen(false);
                         setIsAddModalOpen(true);
                       }}
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-white dark:hover:bg-neutral-900"
+                      className="neu-control w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:text-white dark:hover:bg-neutral-900"
                     >
                       {t("+ Add Account")}
                     </button>
@@ -1693,7 +1636,7 @@ function App() {
                         void handleExportSlimText();
                       }}
                       disabled={isExportingSlim}
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-white dark:hover:bg-neutral-900"
+                      className="neu-control w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-white dark:hover:bg-neutral-900"
                     >
                       {isExportingSlim ? t("Exporting...") : t("Export Slim Text")}
                     </button>
@@ -1703,7 +1646,7 @@ function App() {
                         openImportSlimTextModal();
                       }}
                       disabled={isImportingSlim}
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-white dark:hover:bg-neutral-900"
+                      className="neu-control w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-white dark:hover:bg-neutral-900"
                     >
                       {isImportingSlim ? t("Importing...") : t("Import Slim Text")}
                     </button>
@@ -1713,7 +1656,7 @@ function App() {
                         void handleExportFullFile();
                       }}
                       disabled={isExportingFull}
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-white dark:hover:bg-neutral-900"
+                      className="neu-control w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-white dark:hover:bg-neutral-900"
                     >
                       {isExportingFull ? t("Exporting...") : t("Export Full Encrypted File")}
                     </button>
@@ -1723,7 +1666,7 @@ function App() {
                         void handleImportFullFile();
                       }}
                       disabled={isImportingFull}
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-white dark:hover:bg-neutral-900"
+                      className="neu-control w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-white dark:hover:bg-neutral-900"
                     >
                       {isImportingFull ? t("Importing...") : t("Import Full Encrypted File")}
                     </button>
@@ -1737,7 +1680,8 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-6 pt-4 pb-8">
+      <main className="neu-main max-w-5xl mx-auto px-6 pt-4 pb-8">
+        {activePage === "accounts" && accounts.length > 0 && !error && <AccountOverview count={accounts.length} usage={activeAccount?.usage} />}
         {activePage === "sessions" && canManageHistory ? (
           <SessionManagerPage />
         ) : loading && accounts.length === 0 ? (
@@ -1753,7 +1697,7 @@ function App() {
         ) : accounts.length === 0 ? (
           <div className="text-center py-20">
             <div className="h-16 w-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">👤</span>
+              <UiIcon name="user" width="28" height="28" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
               {t("No accounts yet")}
@@ -1763,7 +1707,7 @@ function App() {
             </p>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="px-6 py-3 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors"
+              className="neu-control px-6 py-3 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors"
             >
               {t("Add Account")}
             </button>
@@ -1810,7 +1754,7 @@ function App() {
                     type="button"
                     onClick={() => setAccountSearchQuery("")}
                     aria-label={t("Clear account search")}
-                    className="absolute inset-y-0 right-2 flex items-center px-2 text-gray-400 transition-colors hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
+                    className="neu-control absolute inset-y-0 right-2 flex items-center px-2 text-gray-400 transition-colors hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
                   >
                     <svg
                       className="h-4 w-4"
@@ -1831,7 +1775,7 @@ function App() {
             {activeAccount &&
               matchesAccountSearch(activeAccount, normalizedAccountSearchQuery) && (
                 <section>
-                  <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
+                  <h2 className="neu-section-label text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
                     {t("Active Account")}
                   </h2>
                   <AccountCard
@@ -1873,7 +1817,7 @@ function App() {
             {visibleOtherAccounts.length > 0 && (
               <section>
                 <div className="flex flex-col items-start sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                  <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <h2 className="neu-section-label text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     {t("Other Accounts (")}{
                       normalizedAccountSearchQuery
                         ? t("{0} of {1}", visibleOtherAccounts.length, otherAccounts.length)
@@ -1930,7 +1874,7 @@ function App() {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="neu-account-grid grid grid-cols-1 md:grid-cols-2 gap-4">
                   {visibleOtherAccounts.map((account) => (
                     <AccountCard
                       key={account.id}
@@ -1973,7 +1917,7 @@ function App() {
 
       {/* Refresh Success Toast */}
       {refreshSuccess && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-3 bg-green-600 text-white rounded-lg shadow-lg text-sm flex items-center gap-2">
+        <div className="neu-toast fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-3 bg-green-600 text-white rounded-lg shadow-lg text-sm flex items-center gap-2">
           <span>✓</span> {t("Usage refreshed successfully")}
         </div>
       )}
@@ -1981,7 +1925,7 @@ function App() {
       {/* Warm-up Toast */}
       {warmupToast && (
         <div
-          className={`fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-3 rounded-lg shadow-lg text-sm ${
+          className={`neu-toast fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-3 rounded-lg shadow-lg text-sm ${
             warmupToast.isError
               ? "bg-red-600 text-white"
               : "bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700"
@@ -1993,7 +1937,7 @@ function App() {
 
       {/* Delete Confirmation Toast */}
       {deleteConfirmId && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-3 bg-red-600 text-white rounded-lg shadow-lg text-sm">
+        <div className="neu-toast fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-3 bg-red-600 text-white rounded-lg shadow-lg text-sm">
           {t("Click delete again to confirm removal")}
         </div>
       )}
@@ -2008,8 +1952,8 @@ function App() {
       )}
 
       {forceCloseConfirmOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div role="dialog" aria-modal="true" aria-labelledby="force-close-title" className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-md mx-4 shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <div className="neu-scrim fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div ref={forceDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="force-close-title" className="neu-dialog bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-md mx-4 shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="p-5 border-b border-gray-100 dark:border-gray-800">
               <h2 id="force-close-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {t("Force close running Codex processes?")}
@@ -2063,7 +2007,7 @@ function App() {
                   setForceCloseConfirmOpen(false);
                 }}
                 disabled={isForceClosingCodex}
-                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors disabled:opacity-50"
+                className="neu-control px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors disabled:opacity-50"
               >
                 {t("Cancel")}
               </button>
@@ -2072,7 +2016,7 @@ function App() {
                   void handleForceCloseConfirm();
                 }}
                 disabled={isForceClosingCodex || desktopReopen.checking}
-                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                className="neu-control px-4 py-2.5 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
               >
                 {isForceClosingCodex
                   ? t("Force closing...")
@@ -2084,10 +2028,10 @@ function App() {
       )}
 
       {closeBehaviorPromptOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-md mx-4 shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <div className="neu-scrim fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div ref={closeDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="close-behavior-title" className="neu-dialog bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-md mx-4 shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="p-5 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              <h2 id="close-behavior-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {t("Keep Codex Switcher in the Dock?")}
               </h2>
             </div>
@@ -2112,21 +2056,21 @@ function App() {
               <button
                 onClick={() => setCloseBehaviorPromptOpen(false)}
                 disabled={isCompletingCloseBehavior}
-                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors disabled:opacity-50"
+                className="neu-control px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors disabled:opacity-50"
               >
                 {t("Cancel")}
               </button>
               <button
                 onClick={() => void handleCloseBehaviorChoice("show_in_dock")}
                 disabled={isCompletingCloseBehavior}
-                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors disabled:opacity-50"
+                className="neu-control px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors disabled:opacity-50"
               >
                 {t("Keep in Dock")}
               </button>
               <button
                 onClick={() => void handleCloseBehaviorChoice("menu_bar_only")}
                 disabled={isCompletingCloseBehavior}
-                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50"
+                className="neu-control px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50"
               >
                 {t("Menu Bar Only")}
               </button>
@@ -2147,18 +2091,17 @@ function App() {
 
       {/* Import/Export Config Modal */}
       {isConfigModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-2xl mx-4 shadow-xl">
+        <div className="neu-scrim fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div ref={configDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="config-dialog-title" className="neu-dialog bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-2xl mx-4 shadow-xl">
             <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              <h2 id="config-dialog-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {configModalMode === "slim_export" ? t("Export Slim Text") : t("Import Slim Text")}
               </h2>
               <button
                 onClick={() => setIsConfigModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              >
-                ✕
-              </button>
+                aria-label={t("Close")}
+                className="neu-control text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              ><UiIcon name="close" /></button>
             </div>
             <div className="p-5 space-y-4">
               {configModalMode === "slim_import" ? (
@@ -2184,7 +2127,7 @@ function App() {
                 className="w-full h-48 px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500 focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 font-mono"
               />
               {configModalError && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-600 dark:text-red-300 text-sm">
+                <div className="neu-notice p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-600 dark:text-red-300 text-sm">
                   {configModalError}
                 </div>
               )}
@@ -2192,7 +2135,8 @@ function App() {
             <div className="flex gap-3 p-5 border-t border-gray-100 dark:border-gray-800">
               <button
                 onClick={() => setIsConfigModalOpen(false)}
-                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors"
+                aria-label={t("Close")}
+                className="neu-control px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors"
               >
                 {t("Close")}
               </button>
@@ -2209,7 +2153,7 @@ function App() {
                     }
                   }}
                   disabled={!configPayload || isExportingSlim}
-                  className="px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50"
+                  className="neu-control px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50"
                 >
                   {configCopied ? t("Copied") : t("Copy String")}
                 </button>
@@ -2217,7 +2161,7 @@ function App() {
                 <button
                   onClick={handleImportSlimText}
                   disabled={isImportingSlim}
-                  className="px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50"
+                  className="neu-control px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50"
                 >
                   {isImportingSlim ? t("Importing...") : t("Import Missing Accounts")}
                 </button>

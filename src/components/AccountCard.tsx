@@ -1,7 +1,8 @@
+import { UiIcon } from "./UiIcon";
 import { t, getLocale } from "../lib/i18n";
-import { useCallback, useState, useRef, useEffect } from "react";
-import type { AccountResetCredits, AccountUsageStats as AccountUsageStatsInfo, AccountWithUsage, SubscriptionInfo } from "../types";
-import { invokeBackend } from "../lib/platform";
+import { useCallback, useState, useRef, useEffect, useId } from "react";
+import type { AccountResetCredits, AccountUsageStats as AccountUsageStatsInfo, AccountWithUsage, SubscriptionInfo, UsageInfo } from "../types";
+import { getAccountStats } from "../lib/accountStats";
 import { AccountUsageStats } from "./AccountUsageStats";
 import { ResetCreditsMenu } from "./ResetCreditsMenu";
 import { UsageBar } from "./UsageBar";
@@ -37,6 +38,13 @@ function formatLastRefresh(date: Date | null): string {
   if (diff < 3600) return t("{0}m ago", Math.floor(diff / 60));
   if (diff < 86400) return t("{0}h ago", Math.floor(diff / 3600));
   return date.toLocaleDateString(getLocale());
+}
+
+function usageFetchedAt(usage: UsageInfo | undefined): Date | null {
+  if (!usage || usage.error) return null;
+  if (!usage.fetched_at) return usage.cached ? null : new Date();
+  const date = new Date(usage.fetched_at);
+  return Number.isFinite(date.getTime()) ? date : null;
 }
 
 function getSubscriptionStatus(subscription: SubscriptionInfo | null | undefined, error?: string | null): {
@@ -97,9 +105,13 @@ export function AccountCard({
   autoWarmupLabel,
   onToggleAutoWarmup,
 }: AccountCardProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const actionsId = useId();
+  const compact = !account.is_active;
+  const showDetails = !compact || detailsOpen;
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(
-    account.usage && !account.usage.error ? new Date() : null
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(() =>
+    usageFetchedAt(account.usage)
   );
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(account.name);
@@ -143,7 +155,7 @@ export function AccountCard({
 
   useEffect(() => {
     if (account.usage && !account.usage.error) {
-      setLastRefresh(new Date());
+      setLastRefresh(usageFetchedAt(account.usage));
     }
   }, [account.usage]);
 
@@ -185,17 +197,6 @@ export function AccountCard({
       ? "API Key"
       : t("Unknown");
 
-  const planColors: Record<string, string> = {
-    pro: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700",
-    plus: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
-    team: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
-    enterprise: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
-    free: "bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700",
-    api_key: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700",
-  };
-
-  const planKey = account.plan_type?.toLowerCase() || "api_key";
-  const planColorClass = planColors[planKey] || planColors.free;
   const showSubscriptionStatus = account.auth_mode === "chat_g_p_t";
   const subscriptionStatus = getSubscriptionStatus(account.subscription, account.subscriptionError);
   const compactResetCredits = !account.is_active;
@@ -209,9 +210,7 @@ export function AccountCard({
     }
 
     try {
-      const stats = await invokeBackend<AccountUsageStatsInfo>("get_account_usage_stats", {
-        accountId: account.id,
-      });
+      const stats = await getAccountStats(account.id);
       if (requestId !== resetRequestSeq.current) return;
       setResetCredits(stats.account_id === account.id ? stats.reset_credits : null);
     } catch {
@@ -244,25 +243,22 @@ export function AccountCard({
 
   return (
     <div
-      className={`relative rounded-xl border p-4 sm:p-5 transition-all duration-200 ${
-        account.is_active
-          ? "bg-white dark:bg-gray-900 border-emerald-400 shadow-sm"
-          : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-      }`}
+      className="neu-account neu-surface"
+      data-active={account.is_active}
+      data-compact={compact && !detailsOpen}
+      data-testid="account-card"
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
+      <div className="neu-account-head flex items-start justify-between mb-3">
+        <div className="neu-account-identity flex-1 min-w-0"><span className="neu-avatar"><UiIcon name="user" /></span><div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             {account.is_active && (
-              <span className="flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
+              <span className="neu-active-dot" aria-hidden="true" />
             )}
             {isEditing ? (
               <input
                 ref={inputRef}
+                aria-label={t("Account Name (optional)")}
                 type="text"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
@@ -272,6 +268,13 @@ export function AccountCard({
               />
             ) : (
               <h3
+                role="button"
+                tabIndex={masked ? -1 : 0}
+                onKeyDown={(event) => {
+                  if (!masked && (event.key === "Enter" || event.key === " ")) {
+                    event.preventDefault(); setEditName(account.name); setIsEditing(true);
+                  }
+                }}
                 className="font-semibold text-gray-900 dark:text-gray-100 truncate cursor-pointer hover:text-gray-600 dark:hover:text-gray-300"
                 onClick={() => {
                   if (masked) return;
@@ -289,23 +292,23 @@ export function AccountCard({
               <BlurredText blur={masked}>{account.email}</BlurredText>
             </p>
           )}
-        </div>
+        </div></div>
 
-        <div className="flex max-w-[60%] flex-wrap items-center justify-end gap-2">
+        <div className="neu-account-tools flex max-w-[60%] flex-wrap items-center justify-end gap-2">
           {/* Refresh */}
-          <button
+          <button aria-label={t("Refresh usage")}
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+            className="neu-control p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
             title={t("Refresh usage")}
           >
-            <span className={`inline-block h-4 w-4 text-base leading-none ${isRefreshing ? "animate-spin" : ""}`}>↻</span>
+            <UiIcon name="refresh" className={isRefreshing ? "animate-spin" : ""} />
           </button>
           {/* Eye toggle */}
           {onToggleMask && (
-            <button
+            <button aria-label={masked ? t("Show info") : t("Hide info")}
               onClick={onToggleMask}
-              className="p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              className="neu-control p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               title={masked ? t("Show info") : t("Hide info")}
             >
               {masked ? (
@@ -322,20 +325,21 @@ export function AccountCard({
           )}
           {/* Plan badge */}
           <span
-            className={`px-2.5 py-1 text-xs font-medium rounded-full border ${planColorClass}`}
+            className="neu-plan"
           >
             {planDisplay}
           </span>
-          <ResetCreditsMenu
+          {showDetails && <ResetCreditsMenu
             compact={compactResetCredits}
             resetCredits={resetCredits}
-          />
+          />}
         </div>
       </div>
 
-      {/* Usage */}
+      {/* Codex/Work usage is not Chat's feature or message quota. */}
       <div className="mb-3">
-        <UsageBar usage={account.usage} loading={isRefreshing || account.usageLoading} />
+        <p className="neu-quota-section-label">{t("Codex quota")}</p>
+        <UsageBar usage={account.usage} loading={isRefreshing || account.usageLoading} compact={compact && !detailsOpen} />
       </div>
 
       {/* Last refresh time */}
@@ -343,7 +347,7 @@ export function AccountCard({
         <div className="text-gray-400 dark:text-gray-500">
           {t("Last updated:")} {formatLastRefresh(lastRefresh)}
         </div>
-        {showSubscriptionStatus && (
+        {showSubscriptionStatus && showDetails && (
           <div className={`text-right ${subscriptionStatus.className}`} title={account.subscriptionError || (account.subscription
             ? t("Subscription checked: {0}", new Date(account.subscription.checked_at).toLocaleString(getLocale()))
             : undefined)}>
@@ -353,11 +357,11 @@ export function AccountCard({
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-2 mt-3">
+      <div className="neu-account-actions flex flex-wrap gap-2 mt-3">
         {account.is_active ? (
           <button
             disabled
-            className="basis-full sm:basis-auto flex-1 whitespace-nowrap px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 cursor-default"
+            className="neu-control neu-active-button basis-full sm:basis-auto flex-1 whitespace-nowrap px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 cursor-default"
           >
             {t("✓ Active")}
           </button>
@@ -365,7 +369,7 @@ export function AccountCard({
           <button
             onClick={onSwitch}
             disabled={switching || switchDisabled}
-            className={`basis-full sm:basis-auto flex-1 whitespace-nowrap flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`neu-control basis-full sm:basis-auto flex-1 whitespace-nowrap flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               codexRunning
                 ? "bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 text-orange-800 dark:text-orange-300"
                 : "bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900"
@@ -380,25 +384,29 @@ export function AccountCard({
             {switching ? t("Switching...") : t("Switch")}
           </button>
         )}
-        <button
+        {compact && <button className="neu-control px-3 py-2 text-sm" aria-expanded={detailsOpen}
+          aria-controls={actionsId} onClick={() => setDetailsOpen(value => !value)}>
+          {detailsOpen ? t("Fewer actions") : t("More actions")}
+        </button>}
+        <div id={actionsId} className="neu-extra-actions" hidden={!showDetails}>
+        <button aria-label={warmingUp ? t("Sending warm-up request...") : t("Send minimal warm-up request")}
           onClick={() => {
             void onWarmup();
           }}
           disabled={warmingUp}
-          className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+          className={`neu-control px-3 py-2 text-sm rounded-lg transition-colors ${
             warmingUp
               ? "bg-amber-100 dark:bg-amber-900/30 text-amber-500 dark:text-amber-300"
               : "bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300"
           }`}
           title={warmingUp ? t("Sending warm-up request...") : t("Send minimal warm-up request")}
-        >
-          ⚡
-        </button>
+        ><UiIcon name="bolt" /></button>
         {onToggleAutoWarmup && (
           <button
             onClick={onToggleAutoWarmup}
+            aria-pressed={autoWarmupEnabled}
             disabled={autoWarmupManagedByAll}
-            className={`px-3 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
+            className={`neu-control px-3 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
               autoWarmupEnabled
                 ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300"
                 : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
@@ -412,14 +420,15 @@ export function AccountCard({
             }
           >
             <span className="flex items-center gap-1">
-              <span>♻</span>
+              <UiIcon name="cycle" />
               <span>{autoWarmupLabel ?? (autoWarmupEnabled ? t("Auto: on") : t("Auto: off"))}</span>
             </span>
           </button>
         )}
-        <button
+        <button aria-label={statsOpen ? t("Hide usage statistics") : t("Show usage statistics")}
           onClick={toggleStatsOpen}
-          className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+          aria-pressed={statsOpen}
+          className={`neu-control px-3 py-2 text-sm rounded-lg transition-colors ${
             statsOpen
               ? "bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300"
               : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
@@ -438,19 +447,18 @@ export function AccountCard({
             <path d="M8 15l3-4 3 2 4-6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <button
+        <button aria-label={t("Remove account")}
           onClick={onDelete}
-          className="px-3 py-2 text-sm rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-300 transition-colors"
+          className="neu-control px-3 py-2 text-sm rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-300 transition-colors"
           title={t("Remove account")}
-        >
-          ✕
-        </button>
+        ><UiIcon name="close" /></button>
+        </div>
       </div>
 
       <AccountUsageStats
         accountId={account.id}
         enabled={account.auth_mode === "chat_g_p_t"}
-        open={statsOpen}
+        open={showDetails && statsOpen}
         usage={account.usage}
         usageLoading={account.usageLoading}
         onStatsLoaded={handleStatsLoaded}

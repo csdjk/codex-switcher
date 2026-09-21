@@ -1,3 +1,5 @@
+import { useDialogFocus } from "../hooks/useDialogFocus";
+import { UiIcon } from "./UiIcon";
 import { useCallback, useMemo, useState } from "react";
 import { getLocale, localizeMessage, t } from "../lib/i18n";
 import { invokeBackend } from "../lib/platform";
@@ -290,8 +292,11 @@ export function SessionManagerPage() {
     );
   };
 
+  const confirmRef = useDialogFocus(!!confirmDialog, () => { if (!isMutating) setConfirmDialog(null); });
+  const processRef = useDialogFocus(!!pendingOperation, () => { if (!isClosingCodex) setPendingOperation(null); });
+
   return (
-    <section className="space-y-3 md:space-y-4" aria-labelledby="history-heading">
+    <section className="neu-history space-y-3 md:space-y-4" aria-labelledby="history-heading">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id="history-heading" className="text-xl font-semibold text-gray-950 dark:text-white">
@@ -305,16 +310,16 @@ export function SessionManagerPage() {
           type="button"
           onClick={() => void history.refresh().catch(() => undefined)}
           disabled={history.loading || isMutating}
-          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+          className="neu-control inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
           aria-label={t("Refresh sessions")}
         >
-          <span className={history.loading ? "animate-spin" : ""}>↻</span>
+          <UiIcon name="refresh" className={history.loading ? "animate-spin" : ""} />
           <span className="hidden sm:inline">{t("Refresh")}</span>
         </button>
       </div>
 
       {notice && (
-        <div className={`rounded-xl border px-4 py-3 text-sm ${notice.error
+        <div className={`neu-notice rounded-xl border px-4 py-3 text-sm ${notice.error
           ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
           : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300"
         }`} role="status">
@@ -328,7 +333,7 @@ export function SessionManagerPage() {
           [t("Active sessions"), history.overview?.totals.active_threads ?? "—"],
           [t("Archived"), history.overview?.totals.archived_threads ?? "—"],
         ].map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900 md:block md:py-3">
+          <div key={label} className="neu-surface flex items-baseline justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900 md:block md:py-3">
             <div className="text-xs text-gray-500 dark:text-gray-400">{label}</div>
             <div className="text-lg font-semibold tabular-nums text-gray-950 dark:text-white md:mt-1 md:text-xl">{value}</div>
           </div>
@@ -336,7 +341,7 @@ export function SessionManagerPage() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-[210px_minmax(0,1fr)] md:gap-4">
-        <aside className="hidden min-w-0 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 md:block">
+        <aside className="neu-surface hidden min-w-0 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 md:block">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("Projects")}</h3>
             {history.overview?.capabilities.project_management === false && (
@@ -349,7 +354,7 @@ export function SessionManagerPage() {
             <button
               type="button"
               onClick={() => { setProjectValue("all"); resetPage(); }}
-              className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm ${projectValue === "all" ? "bg-gray-900 text-white dark:bg-white dark:text-gray-950" : "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"}`}
+              className={`neu-control flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm ${projectValue === "all" ? "bg-gray-900 text-white dark:bg-white dark:text-gray-950" : "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"}`}
             >
               <span>{t("All sessions")}</span>
               <span className="text-xs opacity-70">{archived ? history.overview?.totals.archived_threads : history.overview?.totals.active_threads}</span>
@@ -357,7 +362,7 @@ export function SessionManagerPage() {
             <button
               type="button"
               onClick={() => { setProjectValue("unassigned"); resetPage(); }}
-              className={`flex w-full items-center rounded-lg px-2.5 py-2 text-left text-sm ${projectValue === "unassigned" ? "bg-gray-900 text-white dark:bg-white dark:text-gray-950" : "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"}`}
+              className={`neu-control flex w-full items-center rounded-lg px-2.5 py-2 text-left text-sm ${projectValue === "unassigned" ? "bg-gray-900 text-white dark:bg-white dark:text-gray-950" : "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"}`}
             >
               {t("Unassigned")}
             </button>
@@ -366,7 +371,7 @@ export function SessionManagerPage() {
                 <button
                   type="button"
                   onClick={() => { setProjectValue(`project:${project.id}`); resetPage(); }}
-                  className="min-w-0 flex-1 px-2.5 py-2 text-left"
+                  className="neu-control min-w-0 flex-1 px-2.5 py-2 text-left"
                   title={project.roots.join("\n")}
                 >
                   <span className="block truncate text-sm font-medium text-gray-800 dark:text-gray-100">{project.name}</span>
@@ -376,7 +381,7 @@ export function SessionManagerPage() {
                   <button
                     type="button"
                     onClick={() => setConfirmDialog({ kind: "removeProject", project })}
-                    className="mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+                    className="neu-control mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-300"
                     aria-label={t("Remove {0} project", project.name)}
                     title={t("Remove project")}
                   >
@@ -412,7 +417,7 @@ export function SessionManagerPage() {
               <button
                 type="button"
                 onClick={() => setConfirmDialog({ kind: "removeProject", project: selectedProject })}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-red-800 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+                className="neu-control flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-gray-700 dark:text-gray-300 dark:hover:border-red-800 dark:hover:bg-red-900/20 dark:hover:text-red-300"
                 aria-label={t("Remove {0} project", selectedProject.name)}
                 title={t("Remove project")}
               >
@@ -420,19 +425,19 @@ export function SessionManagerPage() {
               </button>
             )}
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900 md:p-3">
-            <div className="flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+          <div className="neu-surface rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900 md:p-3">
+            <div className="neu-segmented flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
               <button
                 type="button"
-                onClick={() => { setArchived(false); resetPage(); }}
-                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${!archived ? "bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}
+                onClick={() => { setArchived(false); resetPage(); }} aria-pressed={!archived}
+                className={`neu-control flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${!archived ? "bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}
               >
                 {t("Current")}
               </button>
               <button
                 type="button"
-                onClick={() => { setArchived(true); resetPage(); }}
-                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${archived ? "bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}
+                onClick={() => { setArchived(true); resetPage(); }} aria-pressed={archived}
+                className={`neu-control flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${archived ? "bg-white text-gray-950 shadow-sm dark:bg-gray-950 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}
               >
                 {t("Archived")}
               </button>
@@ -440,7 +445,7 @@ export function SessionManagerPage() {
             <div className="mt-3 grid grid-cols-3 gap-2 lg:grid-cols-4">
               <label className="relative col-span-3 lg:col-span-1">
                 <span className="sr-only">{t("Search sessions")}</span>
-                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">⌕</span>
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400"><UiIcon name="search" /></span>
                 <input
                   type="search"
                   value={searchTerm}
@@ -479,24 +484,24 @@ export function SessionManagerPage() {
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-800 dark:bg-blue-900/20">
               <span className="mr-auto text-sm font-medium text-blue-800 dark:text-blue-200">{t("{0} selected", selectedThreads.length)}</span>
               {!archived && (
-                <button type="button" onClick={() => setConfirmDialog({ kind: "archive", threads: selectedThreads })} disabled={isMutating} className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">
+                <button type="button" onClick={() => setConfirmDialog({ kind: "archive", threads: selectedThreads })} disabled={isMutating} className="neu-control rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">
                   {t("Archive selected")}
                 </button>
               )}
               {archived && (
-                <button type="button" onClick={() => void executeSessionActions(selectedThreads.map(thread => ({ action: "unarchive", threadId: thread.id })), t("Selected sessions restored."))} disabled={isMutating} className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">
+                <button type="button" onClick={() => void executeSessionActions(selectedThreads.map(thread => ({ action: "unarchive", threadId: thread.id })), t("Selected sessions restored."))} disabled={isMutating} className="neu-control rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">
                   {t("Restore selected")}
                 </button>
               )}
-              <button type="button" onClick={() => setConfirmDialog({ kind: "delete", threads: selectedThreads })} disabled={isMutating} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50">
+              <button type="button" onClick={() => setConfirmDialog({ kind: "delete", threads: selectedThreads })} disabled={isMutating} className="neu-control rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50">
                 {t("Delete permanently")}
               </button>
             </div>
           )}
 
-          <div className="overflow-visible rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+          <div className="neu-surface overflow-visible rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
             {history.loading && !history.overview ? (
-              <div className="flex min-h-52 items-center justify-center gap-3 text-sm text-gray-500 dark:text-gray-400"><span className="animate-spin">↻</span>{t("Loading sessions...")}</div>
+              <div className="flex min-h-52 items-center justify-center gap-3 text-sm text-gray-500 dark:text-gray-400"><UiIcon name="refresh" className="animate-spin" />{t("Loading sessions...")}</div>
             ) : history.error ? (
               <div className="flex min-h-52 flex-col items-center justify-center px-6 text-center">
                 <div className="mb-2 text-2xl">!</div>
@@ -542,12 +547,12 @@ export function SessionManagerPage() {
                           {!thread.can_mutate && <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-300">{t("This active session cannot be changed yet.")}</p>}
                         </div>
                         <div className="relative shrink-0">
-                          <button type="button" onClick={() => setOpenMenuId(openMenuId === thread.id ? null : thread.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200" aria-label={t("More actions for {0}", thread.title)}>•••</button>
+                          <button type="button" onClick={() => setOpenMenuId(openMenuId === thread.id ? null : thread.id)} className="neu-control flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200" aria-label={t("More actions for {0}", thread.title)}>•••</button>
                           {openMenuId === thread.id && (
-                            <div className="absolute right-0 top-9 z-20 w-36 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-950">
-                              <button type="button" onClick={() => openRename(thread)} disabled={!thread.can_mutate} className="w-full rounded-lg px-2.5 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-200 dark:hover:bg-gray-800">{t("Rename")}</button>
-                              <button type="button" onClick={() => { setOpenMenuId(null); void executeSessionActions([{ action: archived ? "unarchive" : "archive", threadId: thread.id }], archived ? t("Session restored.") : t("Session archived.")); }} disabled={!thread.can_mutate || isMutating} className="w-full rounded-lg px-2.5 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-200 dark:hover:bg-gray-800">{archived ? t("Restore") : t("Archive")}</button>
-                              <button type="button" onClick={() => { setOpenMenuId(null); setConfirmDialog({ kind: "delete", threads: [thread] }); }} disabled={!thread.can_mutate} className="w-full rounded-lg px-2.5 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-40 dark:text-red-300 dark:hover:bg-red-900/20">{t("Delete permanently")}</button>
+                            <div className="neu-popover absolute right-0 top-9 z-20 w-36 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-950">
+                              <button type="button" onClick={() => openRename(thread)} disabled={!thread.can_mutate} className="neu-control w-full rounded-lg px-2.5 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-200 dark:hover:bg-gray-800">{t("Rename")}</button>
+                              <button type="button" onClick={() => { setOpenMenuId(null); void executeSessionActions([{ action: archived ? "unarchive" : "archive", threadId: thread.id }], archived ? t("Session restored.") : t("Session archived.")); }} disabled={!thread.can_mutate || isMutating} className="neu-control w-full rounded-lg px-2.5 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-200 dark:hover:bg-gray-800">{archived ? t("Restore") : t("Archive")}</button>
+                              <button type="button" onClick={() => { setOpenMenuId(null); setConfirmDialog({ kind: "delete", threads: [thread] }); }} disabled={!thread.can_mutate} className="neu-control w-full rounded-lg px-2.5 py-2 text-left text-xs text-red-600 hover:bg-red-50 disabled:opacity-40 dark:text-red-300 dark:hover:bg-red-900/20">{t("Delete permanently")}</button>
                             </div>
                           )}
                         </div>
@@ -563,8 +568,8 @@ export function SessionManagerPage() {
             <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
               <span>{t("Showing {0} sessions", currentThreads.length)}</span>
               <div className="flex gap-2">
-                <button type="button" onClick={() => { const previous = cursorHistory[cursorHistory.length - 1] ?? null; setCursorHistory(items => items.slice(0, -1)); setCursor(previous); setSelected(new Set()); }} disabled={cursorHistory.length === 0 || history.loading} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900">{t("Previous")}</button>
-                <button type="button" onClick={() => { if (!history.overview?.next_cursor) return; setCursorHistory(items => [...items, cursor]); setCursor(history.overview.next_cursor); setSelected(new Set()); }} disabled={!history.overview.next_cursor || history.loading} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900">{t("Next")}</button>
+                <button type="button" onClick={() => { const previous = cursorHistory[cursorHistory.length - 1] ?? null; setCursorHistory(items => items.slice(0, -1)); setCursor(previous); setSelected(new Set()); }} disabled={cursorHistory.length === 0 || history.loading} className="neu-control rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900">{t("Previous")}</button>
+                <button type="button" onClick={() => { if (!history.overview?.next_cursor) return; setCursorHistory(items => [...items, cursor]); setCursor(history.overview.next_cursor); setSelected(new Set()); }} disabled={!history.overview.next_cursor || history.loading} className="neu-control rounded-lg border border-gray-200 bg-white px-3 py-1.5 disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900">{t("Next")}</button>
               </div>
             </div>
           )}
@@ -572,8 +577,8 @@ export function SessionManagerPage() {
       </div>
 
       {confirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="history-confirm-title" className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+        <div className="neu-scrim fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div ref={confirmRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="history-confirm-title" className="neu-dialog max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
             <div className="border-b border-gray-100 p-5 dark:border-gray-800">
               <h2 id="history-confirm-title" className="text-lg font-semibold text-gray-950 dark:text-white">
                 {confirmDialog.kind === "delete" ? t("Delete sessions permanently?") : confirmDialog.kind === "archive" ? t("Archive selected sessions?") : confirmDialog.kind === "rename" ? t("Rename session") : t("Remove project?")}
@@ -619,8 +624,8 @@ export function SessionManagerPage() {
               )}
             </div>
             <div className="flex justify-end gap-3 border-t border-gray-100 p-5 dark:border-gray-800">
-              <button type="button" onClick={() => setConfirmDialog(null)} disabled={isMutating} className="rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">{t("Cancel")}</button>
-              <button type="button" onClick={() => void confirmCurrentDialog()} disabled={isMutating || (confirmDialog.kind === "rename" && !renameDraft.trim())} className={`rounded-lg px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 ${confirmDialog.kind === "delete" || confirmDialog.kind === "removeProject" ? "bg-red-600 hover:bg-red-700" : "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-gray-200"}`}>
+              <button type="button" onClick={() => setConfirmDialog(null)} disabled={isMutating} className="neu-control rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">{t("Cancel")}</button>
+              <button type="button" onClick={() => void confirmCurrentDialog()} disabled={isMutating || (confirmDialog.kind === "rename" && !renameDraft.trim())} className={`neu-control rounded-lg px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 ${confirmDialog.kind === "delete" || confirmDialog.kind === "removeProject" ? "bg-red-600 hover:bg-red-700" : "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-gray-200"}`}>
                 {isMutating ? t("Working...") : confirmDialog.kind === "delete" ? t("Delete permanently") : confirmDialog.kind === "archive" ? t("Archive selected") : confirmDialog.kind === "rename" ? t("Save") : t("Remove project")}
               </button>
             </div>
@@ -629,8 +634,8 @@ export function SessionManagerPage() {
       )}
 
       {pendingOperation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="history-process-title" className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+        <div className="neu-scrim fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div ref={processRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="history-process-title" className="neu-dialog max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
             <div className="border-b border-gray-100 p-5 dark:border-gray-800"><h2 id="history-process-title" className="text-lg font-semibold text-gray-950 dark:text-white">{t("Close Codex to continue?")}</h2></div>
             <div className="space-y-3 p-5">
               <p className="text-sm text-gray-600 dark:text-gray-300">{t("{0} running Codex process(es) must close before session records can change.", processInfo?.count ?? 0)}</p>
@@ -645,8 +650,8 @@ export function SessionManagerPage() {
               </div>
             </div>
             <div className="flex justify-end gap-3 border-t border-gray-100 p-5 dark:border-gray-800">
-              <button type="button" onClick={() => { setPendingOperation(null); setProcessInfo(null); }} disabled={isClosingCodex} className="rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200">{t("Cancel")}</button>
-              <button type="button" onClick={() => void closeCodexAndRetry()} disabled={isClosingCodex || desktopReopen.checking} className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">{isClosingCodex ? t("Force closing...") : t("Close Codex and continue")}</button>
+              <button type="button" onClick={() => { setPendingOperation(null); setProcessInfo(null); }} disabled={isClosingCodex} className="neu-control rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200">{t("Cancel")}</button>
+              <button type="button" onClick={() => void closeCodexAndRetry()} disabled={isClosingCodex || desktopReopen.checking} className="neu-control rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">{isClosingCodex ? t("Force closing...") : t("Close Codex and continue")}</button>
             </div>
           </div>
         </div>

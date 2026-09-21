@@ -52,9 +52,9 @@ export function UpdateChecker() {
   if (!isTauriRuntime() || !release || dismissed) return null;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-lg w-full px-4"
+    <div className="neu-update fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-lg w-full px-4"
       role="status" aria-live="polite" data-testid="app-update-notice">
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-4">
+      <div className="neu-surface bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-4">
         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
           {t("Update available: v")}{release.version}
         </p>
@@ -72,11 +72,11 @@ export function UpdateChecker() {
           </p>
           <div className="flex items-center gap-2 shrink-0">
             <button onClick={() => setDismissed(true)}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors">
+              className="neu-control px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors">
               {t("Later")}
             </button>
             <button onClick={handleOpenRelease} disabled={opening}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50">
+              className="neu-control px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50">
               {t("View release")}
             </button>
           </div>

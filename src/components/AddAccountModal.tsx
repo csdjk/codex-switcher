@@ -1,3 +1,5 @@
+import { useDialogFocus } from "../hooks/useDialogFocus";
+import { UiIcon } from "./UiIcon";
 import { t, localizeMessage } from "../lib/i18n";
 import { useState } from "react";
 import {
@@ -104,28 +106,28 @@ export function AddAccountModal({
     }
   };
 
+  const dialogRef = useDialogFocus(isOpen, handleClose, '[data-neu-trigger="accounts"]');
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div role="dialog" aria-modal="true" aria-labelledby="add-account-title" className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-md mx-4 shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
+    <div className="neu-scrim fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="add-account-title" className="neu-dialog bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-md mx-4 shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
           <h2 id="add-account-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t("Add Account")}</h2>
           <button
             onClick={handleClose}
             aria-label={t("Close")}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          >
-            ✕
-          </button>
+            className="neu-control text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          ><UiIcon name="close" /></button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-100 dark:border-gray-800">
+        <div className="neu-dialog-tabs flex border-b border-gray-100 dark:border-gray-800">
           {(["oauth", "import"] as Tab[]).map((tab) => (
             <button
               key={tab}
+              aria-pressed={activeTab === tab}
               onClick={() => {
                 if (tab === "import" && oauthPending) {
                   void onCancelOAuth().catch((err) => {
@@ -137,7 +139,7 @@ export function AddAccountModal({
                 setActiveTab(tab);
                 setError(null);
               }}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === tab
+              className={`neu-control flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === tab
                   ? "text-gray-900 dark:text-gray-100 border-b-2 border-gray-900 dark:border-gray-100 -mb-px"
                   : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                 }`}
@@ -151,10 +153,11 @@ export function AddAccountModal({
         <div className="p-5 space-y-4">
           {/* Account name is optional; the backend derives one when blank. */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="new-account-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               {t("Account Name (optional)")}
             </label>
             <input
+              id="new-account-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -173,7 +176,7 @@ export function AddAccountModal({
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                     {t("Please open the following link in your browser to proceed:")}
                   </p>
-                  <div className="flex items-center gap-2 mb-2 bg-gray-50 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="neu-inset flex items-center gap-2 mb-2 bg-gray-50 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
                     <input
                       type="text"
                       readOnly
@@ -192,7 +195,7 @@ export function AddAccountModal({
                             setError(t("Clipboard unavailable. Copy the link manually."));
                           });
                       }}
-                      className={`px-3 py-1.5 border rounded text-xs font-medium transition-colors shrink-0 
+                      className={`neu-control px-3 py-1.5 border rounded text-xs font-medium transition-colors shrink-0
                         ${copied
                           ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300"
                           : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -204,7 +207,7 @@ export function AddAccountModal({
                       onClick={() => {
                         void openExternalUrl(authUrl);
                       }}
-                      className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 border border-gray-900 dark:border-gray-100 rounded text-xs font-medium text-white dark:text-gray-900 transition-colors shrink-0"
+                      className="neu-control px-3 py-1.5 bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 border border-gray-900 dark:border-gray-100 rounded text-xs font-medium text-white dark:text-gray-900 transition-colors shrink-0"
                     >
                       {t("Open")}
                     </button>
@@ -229,12 +232,12 @@ export function AddAccountModal({
                 {t("Select auth.json file")}
               </label>
               <div className="flex gap-2">
-                <div className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 truncate">
+                <div className="neu-inset flex-1 px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 truncate">
                   {describeFileSource(fileSource)}
                 </div>
                 <button
                   onClick={handleSelectFile}
-                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors whitespace-nowrap"
+                  className="neu-control px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors whitespace-nowrap"
                 >
                   {t("Browse...")}
                 </button>
@@ -247,7 +250,7 @@ export function AddAccountModal({
 
           {/* Error */}
           {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-600 dark:text-red-300 text-sm">
+            <div className="neu-notice p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-600 dark:text-red-300 text-sm">
               {localizeMessage(error)}
             </div>
           )}
@@ -257,14 +260,14 @@ export function AddAccountModal({
         <div className="flex gap-3 p-5 border-t border-gray-100 dark:border-gray-800">
           <button
             onClick={handleClose}
-            className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors"
+            className="neu-control flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors"
           >
             {t("Cancel")}
           </button>
           <button
             onClick={activeTab === "oauth" ? handleOAuthLogin : handleImportFile}
             disabled={isPrimaryDisabled}
-            className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50"
+            className="neu-control flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900 transition-colors disabled:opacity-50"
           >
             {loading
               ? t("Adding...")

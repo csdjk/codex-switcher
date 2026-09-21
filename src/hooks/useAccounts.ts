@@ -101,7 +101,8 @@ export function useAccounts() {
         accountId: account.id,
       });
       setAccounts(prev => prev.map(a => a.id === account.id
-        ? { ...a, ...updated, subscriptionError: null } : a));
+        ? { ...a, plan_type: updated.plan_type, subscription: updated.subscription,
+            subscription_expires_at: updated.subscription_expires_at, subscriptionError: null } : a));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setAccounts(prev => prev.map(a => a.id === account.id
@@ -109,119 +110,56 @@ export function useAccounts() {
     }
   }, []);
 
-  const refreshUsage = useCallback(
-    async (
-      accountList?: AccountInfo[] | AccountWithUsage[],
-      options?: { refreshMetadata?: boolean }
-    ) => {
-      try {
-        const list = accountList ?? accountsRef.current;
-        if (list.length === 0) {
-          return;
-        }
-
-        // Sync billing on explicit refresh and at least hourly during polling.
-        // A metadata failure must remain visible without blocking usage queries.
-        await runWithConcurrency(
-          list.filter(account => options?.refreshMetadata || !account.subscription ||
-            Date.now() - Date.parse(account.subscription.checked_at) >= 60 * 60 * 1000),
-          refreshSubscription,
-          maxConcurrentUsageRequests
-        );
-
-        const accountIds = list.map((account) => account.id);
-        const accountIdSet = new Set(accountIds);
-        const usageResults = new Map<string, UsageInfo>();
-
-        setAccounts((prev) =>
-          prev.map((account) =>
-            accountIdSet.has(account.id)
-              ? { ...account, usageLoading: true }
-              : account
-          )
-        );
-
-        await runWithConcurrency(
-          list,
-          async (account) => {
-            try {
-              const usage = await invokeBackend<UsageInfo>("get_usage", {
-                accountId: account.id,
-              });
-              usageResults.set(account.id, usage);
-            } catch (err) {
-              console.error("Failed to refresh usage:", err);
-              const message = err instanceof Error ? err.message : String(err);
-              usageResults.set(
-                account.id,
-                buildUsageError(account.id, message, account.plan_type ?? null)
-              );
-            }
-          },
-          maxConcurrentUsageRequests
-        );
-
-        setAccounts((prev) =>
-          prev.map((account) => {
-            const usage = usageResults.get(account.id);
-            if (!usage) return account;
-            return {
-              ...account,
-              usage,
-              usageLoading: false,
-            };
-          })
-        );
-
-        reportUsageToTray(Array.from(usageResults.values()));
-      } catch (err) {
-        console.error("Failed to refresh usage:", err);
+  // Coalesce overlapping clicks/polls in this window; the backend also shares
+  // concurrent requests across the main window and tray.
+  const usageRequests = useRef(new Map<string, Promise<UsageInfo>>());
+  const fetchUsage = useCallback((accountId: string): Promise<UsageInfo> => {
+    const pending = usageRequests.current.get(accountId);
+    if (pending) return pending;
+    setAccounts(prev => prev.map(a => a.id === accountId ? { ...a, usageLoading: true } : a));
+    const request = invokeBackend<UsageInfo>("get_usage", { accountId })
+      .then(usage => {
+        setAccounts(prev => prev.map(a => a.id === accountId ? { ...a, usage, usageLoading: false } : a));
+        reportUsageToTray([usage]);
+        return usage;
+      }, err => {
+        const message = err instanceof Error ? err.message : String(err);
+        setAccounts(prev => prev.map(a => a.id === accountId
+          ? { ...a, usage: buildUsageError(accountId, message, a.plan_type ?? null), usageLoading: false } : a));
         throw err;
-      }
-    },
-    [buildUsageError, refreshSubscription, maxConcurrentUsageRequests, reportUsageToTray, runWithConcurrency]
-  );
+      }).finally(() => { usageRequests.current.delete(accountId); });
+    usageRequests.current.set(accountId, request);
+    return request;
+  }, [buildUsageError, reportUsageToTray]);
+
+  const refreshUsage = useCallback(async (
+    accountList?: AccountInfo[] | AccountWithUsage[],
+    options?: { refreshMetadata?: boolean }
+  ) => {
+    const list = [...(accountList ?? accountsRef.current)]
+      .sort((a, b) => Number(b.is_active) - Number(a.is_active));
+    await Promise.all([
+      runWithConcurrency(list, async account => {
+        try { await fetchUsage(account.id); }
+        catch (err) { console.error("Failed to refresh usage:", err); }
+      }, maxConcurrentUsageRequests),
+      runWithConcurrency(list.filter(account => options?.refreshMetadata || !account.subscription ||
+        Date.now() - Date.parse(account.subscription.checked_at) >= 60 * 60 * 1000),
+        refreshSubscription, maxConcurrentUsageRequests),
+    ]);
+  }, [fetchUsage, refreshSubscription, runWithConcurrency]);
 
   const refreshSingleUsage = useCallback(async (
     accountId: string,
     options?: { refreshMetadata?: boolean }
   ) => {
-    try {
-      if (options?.refreshMetadata) {
-        const account = accountsRef.current.find(a => a.id === accountId);
-        if (account) await refreshSubscription(account);
-      }
-
-      setAccounts((prev) =>
-        prev.map((a) =>
-          a.id === accountId ? { ...a, usageLoading: true } : a
-        )
-      );
-      const usage = await invokeBackend<UsageInfo>("get_usage", { accountId });
-      setAccounts((prev) =>
-        prev.map((a) =>
-          a.id === accountId ? { ...a, usage, usageLoading: false } : a
-        )
-      );
-      reportUsageToTray([usage]);
-      return usage;
-    } catch (err) {
-      console.error("Failed to refresh single usage:", err);
-      const message = err instanceof Error ? err.message : String(err);
-      setAccounts((prev) =>
-        prev.map((a) =>
-          a.id === accountId
-            ? {
-                ...a,
-                usage: buildUsageError(accountId, message, a.plan_type ?? null),
-                usageLoading: false,
-              }
-            : a
-        )
-      );
-      throw err;
-    }
-  }, [buildUsageError, refreshSubscription, reportUsageToTray]);
+    const account = accountsRef.current.find(a => a.id === accountId);
+    const [usage] = await Promise.all([
+      fetchUsage(accountId),
+      options?.refreshMetadata && account ? refreshSubscription(account) : Promise.resolve(),
+    ]);
+    return usage;
+  }, [fetchUsage, refreshSubscription]);
 
   const warmupAccount = useCallback(async (accountId: string) => {
     try {

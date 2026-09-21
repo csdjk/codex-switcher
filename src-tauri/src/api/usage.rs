@@ -4,13 +4,18 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use futures::{stream, StreamExt};
 use reqwest::{
-    header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, USER_AGENT},
+    header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, USER_AGENT, WWW_AUTHENTICATE},
     StatusCode,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::sync::LazyLock;
+use sha2::{Digest, Sha256};
 
+use super::single_flight::SingleFlight;
+
+use super::usage_cache::{load_cached_usage, store_successful_usage};
 use crate::auth::{ensure_chatgpt_tokens_fresh, refresh_chatgpt_tokens};
 use crate::types::{
     AuthData, CreditStatusDetails, RateLimitDetails, RateLimitStatusPayload, RateLimitWindow,
@@ -68,9 +73,21 @@ struct AccountsCheckEntitlement {
 
 /// Get usage information for an account
 pub async fn get_account_usage(account: &StoredAccount) -> Result<UsageInfo> {
+    static REQUESTS: LazyLock<SingleFlight<std::result::Result<UsageInfo, String>>> =
+        LazyLock::new(SingleFlight::new);
+    // Include credential identity so re-imported accounts cannot share an old request.
+    // Only the digest lives in the request map, never raw credentials.
+    let identity = Sha256::digest(serde_json::to_vec(&account.auth_data)?);
+    let key = format!("{}:{identity:x}", account.id);
+    REQUESTS.run(key, || async {
+        fetch_account_usage(account).await.map_err(|error| format!("{error:#}"))
+    }).await.map_err(anyhow::Error::msg)
+}
+
+async fn fetch_account_usage(account: &StoredAccount) -> Result<UsageInfo> {
     println!("[Usage] Fetching usage for account: {}", account.name);
 
-    match &account.auth_data {
+    let live = match &account.auth_data {
         AuthData::ApiKey { .. } => {
             println!("[Usage] API key accounts don't support usage info");
             Ok(UsageInfo {
@@ -85,10 +102,49 @@ pub async fn get_account_usage(account: &StoredAccount) -> Result<UsageInfo> {
                 has_credits: None,
                 unlimited_credits: None,
                 credits_balance: None,
+                cached: false,
+                fetched_at: None,
                 error: Some("Usage info not available for API key accounts".to_string()),
             })
         }
         AuthData::ChatGPT { .. } => get_usage_with_chatgpt_auth(account).await,
+    };
+
+    match live {
+        Ok(usage) if usage.error.is_none() => {
+            if let Err(error) = store_successful_usage(&usage) {
+                eprintln!("[Usage] Failed to store last-successful usage cache: {error}");
+            }
+            Ok(usage)
+        }
+        Ok(error_usage) => match load_cached_usage(&account.id, Utc::now()) {
+            Ok(Some(cached)) => {
+                println!(
+                    "[Usage] Live quota unavailable for {}, using cached snapshot",
+                    account.name
+                );
+                Ok(cached)
+            }
+            Ok(None) => Ok(error_usage),
+            Err(cache_error) => {
+                eprintln!("[Usage] Failed to read usage cache: {cache_error}");
+                Ok(error_usage)
+            }
+        },
+        Err(live_error) => match load_cached_usage(&account.id, Utc::now()) {
+            Ok(Some(cached)) => {
+                println!(
+                    "[Usage] Live quota request failed for {}, using cached snapshot: {}",
+                    account.name, live_error
+                );
+                Ok(cached)
+            }
+            Ok(None) => Err(live_error),
+            Err(cache_error) => {
+                eprintln!("[Usage] Failed to read usage cache: {cache_error}");
+                Err(live_error)
+            }
+        },
     }
 }
 
@@ -165,54 +221,119 @@ async fn get_usage_with_chatgpt_auth(account: &StoredAccount) -> Result<UsageInf
     let fresh_account = ensure_chatgpt_tokens_fresh(account).await?;
     let (access_token, chatgpt_account_id) = extract_chatgpt_auth(&fresh_account)?;
 
-    let response = send_chatgpt_usage_request(access_token, chatgpt_account_id).await?;
+    let response =
+        read_usage_response(send_chatgpt_usage_request(access_token, chatgpt_account_id).await?)
+            .await?;
 
-    // 401 means the token is genuinely expired — refresh and retry once.
-    // 403 is a Cloudflare challenge or permissions error; refreshing the token
-    // would burn the refresh token unnecessarily (refresh_token_reused error).
-    if response.status() == StatusCode::UNAUTHORIZED {
+    // 401 always means the bearer token must be renewed. Some ChatGPT backend
+    // paths also report an explicitly invalid/expired bearer as JSON 403.
+    // Only refresh those authenticated 403s; never refresh for Cloudflare HTML
+    // challenges or generic permission errors, because refresh tokens rotate.
+    if usage_response_needs_token_refresh(&response) {
         println!(
-            "[Usage] Unauthorized for account {}, refreshing token and retrying once",
+            "[Usage] Authentication expired for account {}, refreshing token and retrying once",
             fresh_account.name
         );
         let refreshed_account = refresh_chatgpt_tokens(&fresh_account).await?;
         let (retry_token, retry_account_id) = extract_chatgpt_auth(&refreshed_account)?;
-        let retry_response = send_chatgpt_usage_request(retry_token, retry_account_id).await?;
+        let retry_response =
+            read_usage_response(send_chatgpt_usage_request(retry_token, retry_account_id).await?)
+                .await?;
         return parse_usage_response(
             &refreshed_account.id,
             &refreshed_account.name,
             retry_response,
-        )
-        .await;
+        );
     }
 
-    parse_usage_response(&fresh_account.id, &fresh_account.name, response).await
+    parse_usage_response(&fresh_account.id, &fresh_account.name, response)
 }
 
-async fn parse_usage_response(
+struct UsageHttpResponse {
+    status: StatusCode,
+    www_authenticate: Option<String>,
+    body: String,
+}
+
+async fn read_usage_response(response: reqwest::Response) -> Result<UsageHttpResponse> {
+    let status = response.status();
+    let www_authenticate = response
+        .headers()
+        .get(WWW_AUTHENTICATE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let body = response
+        .text()
+        .await
+        .context("Failed to read usage response body")?;
+    Ok(UsageHttpResponse {
+        status,
+        www_authenticate,
+        body,
+    })
+}
+
+fn usage_response_needs_token_refresh(response: &UsageHttpResponse) -> bool {
+    if response.status == StatusCode::UNAUTHORIZED {
+        return true;
+    }
+    if response.status != StatusCode::FORBIDDEN {
+        return false;
+    }
+
+    let authenticate = response
+        .www_authenticate
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if authenticate.contains("invalid_token") || authenticate.contains("expired") {
+        return true;
+    }
+
+    let body = response.body.trim_start();
+    if !(body.starts_with('{') || body.starts_with('[')) {
+        return false;
+    }
+    let body = body.to_ascii_lowercase();
+    if body.contains("cloudflare") || body.contains("enable javascript") {
+        return false;
+    }
+    [
+        "invalid_token",
+        "invalid bearer",
+        "invalid access token",
+        "access token is invalid",
+        "token expired",
+        "expired token",
+        "could not validate credentials",
+    ]
+    .iter()
+    .any(|marker| body.contains(marker))
+}
+
+fn parse_usage_response(
     account_id: &str,
     account_name: &str,
-    response: reqwest::Response,
+    response: UsageHttpResponse,
 ) -> Result<UsageInfo> {
-    let status = response.status();
+    let status = response.status;
     println!("[Usage] Response status: {status}");
 
     if !status.is_success() {
-        let body = response.text().await.unwrap_or_default();
-        println!("[Usage] Error response: {body}");
+        println!(
+            "[Usage] Error response: {}",
+            truncate_text(&response.body, 300)
+        );
         return Ok(UsageInfo::error(
             account_id.to_string(),
             format!("API error: {status}"),
         ));
     }
 
-    let body_text = response
-        .text()
-        .await
-        .context("Failed to read response body")?;
+    let body_text = response.body;
     println!(
         "[Usage] Response body: {}",
-        &body_text[..body_text.len().min(200)]
+        truncate_text(&body_text, 200)
     );
 
     let payload: RateLimitStatusPayload =
@@ -456,7 +577,11 @@ fn truncate_text(text: &str, max_len: usize) -> String {
     if text.len() <= max_len {
         return text.to_string();
     }
-    let mut out = text[..max_len].to_string();
+    let mut end = max_len;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    let mut out = text[..end].to_string();
     out.push_str("...");
     out
 }
@@ -538,6 +663,8 @@ fn convert_payload_to_usage_info(account_id: &str, payload: RateLimitStatusPaylo
         has_credits: credits.as_ref().map(|c| c.has_credits),
         unlimited_credits: credits.as_ref().map(|c| c.unlimited),
         credits_balance: credits.and_then(|c| c.balance),
+        cached: false,
+        fetched_at: Some(Utc::now()),
         error: None,
     }
 }
@@ -601,6 +728,76 @@ pub async fn refresh_all_usage(accounts: &[StoredAccount]) -> Vec<UsageInfo> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn log_preview_truncates_only_at_utf8_boundaries() {
+        let text = "中文😀quota";
+        for limit in 0..=text.len() {
+            let preview = truncate_text(text, limit);
+            if limit < text.len() {
+                let prefix = preview.strip_suffix("...").unwrap();
+                assert!(text.starts_with(prefix));
+                assert!(prefix.len() <= limit);
+            } else {
+                assert_eq!(preview, text);
+            }
+        }
+    }
+
+    #[test]
+    fn parses_usage_with_multibyte_text_crossing_log_preview_boundary() {
+        let response = usage_http_response(
+            StatusCode::OK,
+            None,
+            &serde_json::json!({"plan_type": "中文套餐".repeat(80)}).to_string(),
+        );
+        let usage = parse_usage_response("test", "test", response).unwrap();
+        assert!(usage.error.is_none());
+        assert_eq!(usage.plan_type.as_deref(), Some("中文套餐".repeat(80).as_str()));
+    }
+
+    fn usage_http_response(
+        status: StatusCode,
+        www_authenticate: Option<&str>,
+        body: &str,
+    ) -> UsageHttpResponse {
+        UsageHttpResponse {
+            status,
+            www_authenticate: www_authenticate.map(str::to_owned),
+            body: body.to_string(),
+        }
+    }
+
+    #[test]
+    fn token_refresh_detection_accepts_auth_failures_but_not_cloudflare() {
+        assert!(usage_response_needs_token_refresh(&usage_http_response(
+            StatusCode::UNAUTHORIZED,
+            None,
+            "{}"
+        )));
+        assert!(usage_response_needs_token_refresh(&usage_http_response(
+            StatusCode::FORBIDDEN,
+            Some("Bearer error=\"invalid_token\""),
+            "{}"
+        )));
+        assert!(usage_response_needs_token_refresh(&usage_http_response(
+            StatusCode::FORBIDDEN,
+            None,
+            r#"{"detail":"Could not validate credentials"}"#
+        )));
+        assert!(!usage_response_needs_token_refresh(&usage_http_response(
+            StatusCode::FORBIDDEN,
+            None,
+            "<!doctype html><title>Just a moment...</title>Cloudflare"
+        )));
+        assert!(!usage_response_needs_token_refresh(&usage_http_response(
+            StatusCode::FORBIDDEN,
+            None,
+            r#"{"detail":"permission denied"}"#
+        )));
+    }
+
     #[test]
     fn subscription_keeps_billing_renewal_separate_from_entitlement_expiry() {
         let payload = serde_json::from_value(serde_json::json!({"accounts": {
@@ -649,8 +846,6 @@ mod tests {
             serde_json::from_value(serde_json::json!({"accounts": {"default": {}}})).unwrap();
         assert!(super::metadata_from_accounts_check(&payload, None).is_err());
     }
-
-    use super::*;
 
     fn rate_limit_window(used_percent: f64, window_seconds: i32) -> RateLimitWindow {
         RateLimitWindow {

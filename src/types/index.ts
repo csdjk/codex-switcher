@@ -34,6 +34,8 @@ export interface UsageInfo {
   has_credits: boolean | null;
   unlimited_credits: boolean | null;
   credits_balance: string | null;
+  cached?: boolean;
+  fetched_at?: string | null;
   error: string | null;
 }
 

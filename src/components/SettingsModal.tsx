@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../hooks/useDialogFocus";
 import { t, setLanguage, type Language } from "../lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopReopenPreference } from "../lib/desktopReopen";
@@ -18,6 +19,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ language, preference, onChange, onClose }: SettingsModalProps) {
+  const dialogRef = useDialogFocus(true, onClose, '[data-neu-trigger="settings"]');
   const [languageError, setLanguageError] = useState<string | null>(null);
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -78,8 +80,8 @@ export function SettingsModal({ language, preference, onChange, onClose }: Setti
   const selectClassName = "w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 disabled:opacity-50";
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div role="dialog" aria-modal="true" aria-labelledby="settings-title" className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-md mx-4 shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
+    <div className="neu-scrim fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="settings-title" className="neu-dialog bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-md mx-4 shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <div className="p-5 border-b border-gray-100 dark:border-gray-800">
           <h2 id="settings-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t("Settings")}</h2>
         </div>
@@ -146,7 +148,7 @@ export function SettingsModal({ language, preference, onChange, onClose }: Setti
           </p>
         </div>
         <div className="flex justify-end p-5 border-t border-gray-100 dark:border-gray-800">
-          <button onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50">{t("Done")}</button>
+          <button onClick={onClose} disabled={saving} className="neu-control px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50">{t("Done")}</button>
         </div>
       </div>
     </div>

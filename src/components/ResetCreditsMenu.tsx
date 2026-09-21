@@ -103,7 +103,7 @@ export function ResetCreditsMenu({
 
   return (
     <div ref={wrapperRef} className="relative min-w-0 max-w-full">
-      <button
+      <button aria-label={t("{0} · {1} · Click for expiry details", countLabel, nextExpiryLabel)}
         ref={buttonRef}
         type="button"
         aria-expanded={isOpen}
@@ -111,9 +111,9 @@ export function ResetCreditsMenu({
         aria-haspopup="dialog"
         onClick={() => setIsOpen((open) => !open)}
         className={
-          compact
+          "neu-control " + (compact
             ? `flex min-w-0 max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] leading-none transition-colors hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-sky-400/60 ${tone.container} ${tone.text}`
-            : `flex max-w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition-colors hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-sky-400/60 ${tone.container}`
+            : `flex max-w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition-colors hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-sky-400/60 ${tone.container}`)
         }
         title={t("{0} · {1} · Click for expiry details", countLabel, nextExpiryLabel)}
       >
@@ -150,7 +150,7 @@ export function ResetCreditsMenu({
           id={popupId}
           role="dialog"
           aria-label={t("Reset credit expiry details")}
-          className="absolute right-0 top-full z-30 mt-2 w-80 max-w-[calc(100vw-3rem)] overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl dark:border-gray-700 dark:bg-gray-900"
+          className="neu-popover absolute right-0 top-full z-30 mt-2 w-80 max-w-[calc(100vw-3rem)] overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl dark:border-gray-700 dark:bg-gray-900"
         >
           <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2.5 dark:border-gray-800">
             <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">

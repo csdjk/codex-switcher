@@ -4,6 +4,7 @@ import type { UsageInfo } from "../types";
 interface UsageBarProps {
   usage?: UsageInfo;
   loading?: boolean;
+  compact?: boolean;
 }
 
 function formatResetTime(resetAt: number | null | undefined): string {
@@ -34,53 +35,61 @@ function formatWindowDuration(minutes: number | null | undefined): string {
   return t("{0}d", Math.floor(hours / 24));
 }
 
+export function formatCachedAt(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return new Intl.DateTimeFormat(getLocale(), {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function RateLimitBar({
   label,
   usedPercent,
   windowMinutes,
   resetsAt,
+  compact = false,
 }: {
   label: string;
   usedPercent: number;
   windowMinutes?: number | null;
   resetsAt?: number | null;
+  compact?: boolean;
 }) {
   // Calculate remaining percentage
-  const remainingPercent = Math.max(0, 100 - usedPercent);
-  
-  // Color based on remaining (green = plenty left, red = almost none left)
-  const colorClass =
-    remainingPercent <= 10
-      ? "bg-red-500"
-      : remainingPercent <= 30
-        ? "bg-amber-500"
-        : "bg-emerald-500";
+  const remainingPercent = Math.max(0, Math.min(100, 100 - usedPercent));
+
+  const tone = remainingPercent <= 10 ? "danger" : remainingPercent <= 30 ? "warning" : "normal";
 
   const windowLabel = formatWindowDuration(windowMinutes);
   const resetLabel = formatResetTime(resetsAt);
   const exactResetLabel = formatExactResetTime(resetsAt);
 
   return (
-    <div className="space-y-1">
-      <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-        <span className="shrink-0">{windowLabel ? t("{0} limit", windowLabel) : label}</span>
-        <span className="text-right">
-          {remainingPercent.toFixed(0)}{t("% left")}
-          {resetLabel && t(" • resets {0}", resetLabel)}
-          {resetLabel && exactResetLabel && ` (${exactResetLabel})`}
-        </span>
+    <div className="neu-usage" data-tone={tone}>
+      <div className="neu-usage-heading">
+        <span>{windowLabel ? t("{0} limit", windowLabel) : label}</span>
+        <strong>{remainingPercent.toFixed(0)}<small>%</small></strong>
       </div>
-      <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-        <div
-          className={`h-full transition-all duration-300 ${colorClass}`}
-          style={{ width: `${Math.min(remainingPercent, 100)}%` }}
-        ></div>
+      <div className="neu-usage-track" role="progressbar"
+        aria-label={windowLabel ? t("{0} limit", windowLabel) : label}
+        aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(remainingPercent)}
+        aria-valuetext={`${remainingPercent.toFixed(0)}${t("% left")}`}>
+        <div className="neu-usage-fill" style={{ width: `${remainingPercent}%` }} />
       </div>
+      {resetLabel && <p className="neu-usage-meta" title={exactResetLabel || undefined}>
+        {t(" • resets {0}", resetLabel).replace(/^\s*•\s*/, "")}
+        {!compact && exactResetLabel && ` (${exactResetLabel})`}
+      </p>}
     </div>
   );
 }
 
-export function UsageBar({ usage, loading }: UsageBarProps) {
+export function UsageBar({ usage, loading, compact = false }: UsageBarProps) {
   if (loading && !usage) {
     return (
       <div className="space-y-2">
@@ -110,8 +119,8 @@ export function UsageBar({ usage, loading }: UsageBarProps) {
     );
   }
 
-  const hasPrimary = usage.primary_used_percent !== null && usage.primary_used_percent !== undefined;
-  const hasSecondary = usage.secondary_used_percent !== null && usage.secondary_used_percent !== undefined;
+  const hasPrimary = typeof usage.primary_used_percent === "number" && Number.isFinite(usage.primary_used_percent);
+  const hasSecondary = typeof usage.secondary_used_percent === "number" && Number.isFinite(usage.secondary_used_percent);
 
   if (!hasPrimary && !hasSecondary) {
     return (
@@ -121,14 +130,26 @@ export function UsageBar({ usage, loading }: UsageBarProps) {
     );
   }
 
+  const cachedAt = formatCachedAt(usage.fetched_at);
+
   return (
-    <div className="space-y-2">
+    <div className="neu-usage-group space-y-2">
+      {usage.cached && (
+        <p
+          className="neu-cache-note"
+          role="status"
+          title={t("Live quota is temporarily unavailable.")}
+        >
+          {cachedAt ? t("Cached quota from {0}", cachedAt) : t("Cached quota")}
+        </p>
+      )}
       {hasPrimary && (
         <RateLimitBar
           label={t("5h Limit")}
           usedPercent={usage.primary_used_percent!}
           windowMinutes={usage.primary_window_minutes}
           resetsAt={usage.primary_resets_at}
+          compact={compact}
         />
       )}
       {hasSecondary && (
@@ -137,10 +158,11 @@ export function UsageBar({ usage, loading }: UsageBarProps) {
           usedPercent={usage.secondary_used_percent!}
           windowMinutes={usage.secondary_window_minutes}
           resetsAt={usage.secondary_resets_at}
+          compact={compact}
         />
       )}
-      {usage.credits_balance && (
-        <div className="text-xs text-gray-500 dark:text-gray-400">
+      {!compact && usage.credits_balance && (
+        <div className="neu-credits text-xs text-gray-500 dark:text-gray-400">
           {t("Credits:")} {usage.credits_balance}
         </div>
       )}

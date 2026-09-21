@@ -1,3 +1,4 @@
+import { UiIcon } from "./components/UiIcon";
 import { t, useLanguage } from "./lib/i18n";
 import { useCallback, useEffect, useState } from "react";
 import type { AccountInfo, AccountUsageStats, DockDisplayMode, UsageInfo } from "./types";
@@ -341,9 +342,9 @@ function TrayMenu() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-900 shadow-2xl dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-      <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 dark:border-gray-800">
-        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-black text-xs font-bold text-white">
+    <div className="neu-tray flex h-screen w-screen flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-900 shadow-2xl dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+      <div className="neu-tray-head flex items-center gap-2 border-b border-gray-100 px-3 py-2 dark:border-gray-800">
+        <div className="neu-brand-symbol flex h-6 w-6 items-center justify-center rounded-md bg-black text-xs font-bold text-white">
           C
         </div>
         <span className="text-sm font-semibold">Codex Switcher</span>
@@ -355,7 +356,7 @@ function TrayMenu() {
               ? t("Disable auto warm-up for all accounts")
               : t("Enable auto warm-up for all accounts")
           }
-          className={`ml-auto rounded-md px-2 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50 ${
+          className={`neu-control ml-auto rounded-md px-2 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50 ${
             autoWarmupAllEnabled
               ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
@@ -363,19 +364,17 @@ function TrayMenu() {
         >
           {autoWarmupAllEnabled ? t("Auto: on") : t("Auto: off")}
         </button>
-        <button
+        <button aria-label={t("Refresh usage")}
           onClick={() => void handleRefresh()}
           disabled={refreshing}
           title={t("Refresh usage")}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+          className="neu-control flex h-6 w-6 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
         >
-          <span className={`text-base leading-none ${refreshing ? "inline-block animate-spin" : ""}`}>
-            ↻
-          </span>
+          <span className={`text-base leading-none ${refreshing ? "inline-block animate-spin" : ""}`}><UiIcon name="refresh" /></span>
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-1.5">
+      <div className="neu-tray-scroll flex-1 overflow-y-auto p-1.5">
         {loading ? (
           <div className="px-2 py-6 text-center text-xs text-gray-500 dark:text-gray-400">
             {t("Loading...")}
@@ -414,7 +413,8 @@ function TrayMenu() {
                 key={account.id}
                 onClick={() => void handleSwitch(account)}
                 disabled={switchingId !== null}
-                className={`flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors disabled:opacity-60 ${
+                data-active={account.is_active}
+                className={`neu-control neu-tray-account flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors disabled:opacity-60 ${
                   account.is_active
                     ? "bg-gray-100 dark:bg-gray-800"
                     : "hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -448,12 +448,17 @@ function TrayMenu() {
                   </span>
                   {windows.length > 0 ? (
                     <span className="mt-1.5 block space-y-1.5">
+                      {usage?.cached && (
+                        <span className="block text-[10px] font-semibold text-amber-600 dark:text-amber-300">
+                          {t("Cached quota")}
+                        </span>
+                      )}
                       {windows.map((w) => {
                         const remaining = Math.max(0, 100 - w.used);
                         const tone = remainingTone(remaining);
                         const reset = formatResetAt(w.resetAt);
                         return (
-                          <span key={w.label} className="block">
+                          <span key={w.label} className="neu-tray-limit block" data-tone={remaining <= 10 ? "danger" : remaining <= 30 ? "warning" : "normal"}>
                             <span className="flex items-center gap-1">
                               <span className="text-[11px] font-medium text-gray-700 dark:text-gray-200">
                                 {w.label}
@@ -462,9 +467,9 @@ function TrayMenu() {
                                 className={`h-1.5 w-1.5 rounded-full ${tone.dot}`}
                               />
                             </span>
-                            <span className="mt-0.5 block h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+                            <span className="neu-usage-track mt-0.5 block h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
                               <span
-                                className={`block h-full rounded-full ${tone.bar}`}
+                                className={`neu-usage-fill block h-full rounded-full ${tone.bar}`}
                                 style={{ width: `${Math.min(remaining, 100)}%` }}
                               />
                             </span>
@@ -493,13 +498,13 @@ function TrayMenu() {
                   ) : null}
                   {account.is_active && stats?.available && (
                     <span className="mt-2 grid grid-cols-2 gap-1.5">
-                      <span className="rounded-md bg-white px-2 py-1 text-[11px] text-gray-600 shadow-sm dark:bg-gray-950 dark:text-gray-300">
+                      <span className="neu-tray-stat rounded-md bg-white px-2 py-1 text-[11px] text-gray-600 shadow-sm dark:bg-gray-950 dark:text-gray-300">
                         <span className="block font-medium text-gray-900 dark:text-gray-100">
                           {formatTokens(sumDailyTokens(stats, 1))}
                         </span>
                         <span>{t("today")}</span>
                       </span>
-                      <span className="rounded-md bg-white px-2 py-1 text-[11px] text-gray-600 shadow-sm dark:bg-gray-950 dark:text-gray-300">
+                      <span className="neu-tray-stat rounded-md bg-white px-2 py-1 text-[11px] text-gray-600 shadow-sm dark:bg-gray-950 dark:text-gray-300">
                         <span className="block font-medium text-gray-900 dark:text-gray-100">
                           {formatTokens(sumDailyTokens(stats, 7))}
                         </span>
@@ -530,7 +535,7 @@ function TrayMenu() {
           </span>
           <button
             onClick={() => void handleDockDisplayMode("show_in_dock")}
-            className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+            className={`neu-control rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
               dockDisplayMode === "show_in_dock"
                 ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
@@ -540,7 +545,7 @@ function TrayMenu() {
           </button>
           <button
             onClick={() => void handleDockDisplayMode("menu_bar_only")}
-            className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+            className={`neu-control rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
               dockDisplayMode === "menu_bar_only"
                 ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
@@ -551,16 +556,16 @@ function TrayMenu() {
         </div>
       )}
 
-      <div className="flex items-center gap-1 border-t border-gray-100 p-1.5 dark:border-gray-800">
+      <div className="neu-tray-footer flex items-center gap-1 border-t border-gray-100 p-1.5 dark:border-gray-800">
         <button
           onClick={() => void invokeBackend("open_main_window")}
-          className="flex-1 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="neu-control flex-1 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
         >
           {t("Open Codex Switcher")}
         </button>
         <button
           onClick={() => void invokeBackend("quit_app")}
-          className="rounded-lg px-2 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-red-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-red-400"
+          className="neu-control rounded-lg px-2 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-red-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-red-400"
         >
           {t("Quit")}
         </button>

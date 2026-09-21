@@ -1,0 +1,303 @@
+{
+  "baseURL": "http://127.0.0.1:3221",
+  "fixtures": true,
+  "results": [
+    {
+      "lang": "zh",
+      "theme": "light",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      },
+      "mobile": false,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "zh-light-1000-card.png",
+        "zh-light-1000-viewport.png"
+      ]
+    },
+    {
+      "lang": "zh",
+      "theme": "dark",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      },
+      "mobile": false,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "zh-dark-1000-card.png",
+        "zh-dark-1000-viewport.png"
+      ]
+    },
+    {
+      "lang": "zh",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "zh-light-320-card.png",
+        "zh-light-320-viewport.png"
+      ]
+    },
+    {
+      "lang": "zh",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "zh-dark-320-card.png",
+        "zh-dark-320-viewport.png"
+      ]
+    },
+    {
+      "lang": "zh",
+      "theme": "light",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "zh-light-375-card.png",
+        "zh-light-375-viewport.png"
+      ]
+    },
+    {
+      "lang": "zh",
+      "theme": "dark",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "zh-dark-375-card.png",
+        "zh-dark-375-viewport.png"
+      ]
+    },
+    {
+      "lang": "zh",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "zh-light-390-card.png",
+        "zh-light-390-viewport.png"
+      ]
+    },
+    {
+      "lang": "zh",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "zh-dark-390-card.png",
+        "zh-dark-390-viewport.png"
+      ]
+    },
+    {
+      "lang": "en",
+      "theme": "light",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      },
+      "mobile": false,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "en-light-1000-card.png",
+        "en-light-1000-viewport.png"
+      ]
+    },
+    {
+      "lang": "en",
+      "theme": "dark",
+      "viewport": {
+        "width": 1000,
+        "height": 800
+      },
+      "mobile": false,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "en-dark-1000-card.png",
+        "en-dark-1000-viewport.png"
+      ]
+    },
+    {
+      "lang": "en",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "en-light-320-card.png",
+        "en-light-320-viewport.png"
+      ]
+    },
+    {
+      "lang": "en",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "en-dark-320-card.png",
+        "en-dark-320-viewport.png"
+      ]
+    },
+    {
+      "lang": "en",
+      "theme": "light",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "en-light-375-card.png",
+        "en-light-375-viewport.png"
+      ]
+    },
+    {
+      "lang": "en",
+      "theme": "dark",
+      "viewport": {
+        "width": 375,
+        "height": 667
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "en-dark-375-card.png",
+        "en-dark-375-viewport.png"
+      ]
+    },
+    {
+      "lang": "en",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "en-light-390-card.png",
+        "en-light-390-viewport.png"
+      ]
+    },
+    {
+      "lang": "en",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "mobile": true,
+      "dpr": 1,
+      "remaining": [
+        68,
+        19
+      ],
+      "screenshots": [
+        "en-dark-390-card.png",
+        "en-dark-390-viewport.png"
+      ]
+    }
+  ],
+  "checks": [
+    "Codex refresh",
+    "weekly quota retained",
+    "statistics retained",
+    "no Chat entry or request",
+    "no horizontal overflow"
+  ],
+  "runtimeErrors": [],
+  "screenshots_directory": "Temp/codex-only-qa"
+}

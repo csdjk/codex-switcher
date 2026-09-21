@@ -1,0 +1,353 @@
+/* Codex Switcher / Mist. Neumorphic surfaces share one cool-grey material.
+   Semantic classes live outside Tailwind's utility layer; behavior stays in TSX. */
+:root {
+  --neu-bg: #e8edf2;
+  --neu-face: #e8edf2;
+  --neu-high: #f0f4f7;
+  --neu-low: #e1e7ed;
+  --neu-ink: #293d52;
+  --neu-muted: #576a7e;
+  --neu-accent: #4c7093;
+  --neu-accent-light: #9db3c9;
+  --neu-on-accent: #fff;
+  --neu-shadow: rgba(160, 175, 192, .55);
+  --neu-light: rgba(255, 255, 255, .92);
+  --neu-raised: 7px 7px 17px var(--neu-shadow), -7px -7px 17px var(--neu-light);
+  --neu-small: 3px 3px 7px var(--neu-shadow), -3px -3px 7px var(--neu-light);
+  --neu-inset: inset 3px 3px 6px var(--neu-shadow), inset -3px -3px 6px var(--neu-light);
+  --neu-focus: #365f89;
+  --neu-danger: #a33e4b;
+  --neu-danger-bg: #f0dfe3;
+  --neu-warning: #805414;
+  --neu-warning-bg: #efe6d7;
+  --neu-success: #356955;
+  --neu-scrim: rgba(48, 63, 82, .32);
+  --neu-scroll-thumb: #a9b8c7;
+  --neu-scroll-thumb-hover: #8399ae;
+  --neu-scroll-highlight: rgba(255, 255, 255, .72);
+  --neu-scroll-shadow: rgba(109, 128, 148, .28);
+  --neu-radius: 16px;
+}
+:root.dark {
+  --neu-bg: #252e3b;
+  --neu-face: #252e3b;
+  --neu-high: #2a3543;
+  --neu-low: #222a36;
+  --neu-ink: #e3ebf4;
+  --neu-muted: #b1c0d1;
+  --neu-accent: #adc7e2;
+  --neu-accent-light: #6989aa;
+  --neu-on-accent: #202e40;
+  --neu-shadow: rgba(11, 17, 26, .55);
+  --neu-light: rgba(64, 79, 98, .45);
+  --neu-focus: #bddcff;
+  --neu-danger: #ffa9b6;
+  --neu-danger-bg: #44323e;
+  --neu-warning: #ebc28a;
+  --neu-warning-bg: #3b3740;
+  --neu-success: #a2d2bd;
+  --neu-scrim: rgba(8, 14, 22, .62);
+  --neu-scroll-thumb: #53677c;
+  --neu-scroll-thumb-hover: #7890a8;
+  --neu-scroll-highlight: rgba(255, 255, 255, .14);
+  --neu-scroll-shadow: rgba(4, 8, 14, .48);
+}
+html { background: var(--neu-bg); }
+body { margin: 0; font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif; color: var(--neu-ink); -webkit-font-smoothing: antialiased; }
+
+/* Scrollbars share the same soft material as the interface: almost invisible
+   track + a slim rounded thumb with a restrained raised highlight. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--neu-scroll-thumb) transparent;
+}
+:where(html, body, .neu-app, .neu-tray, .neu-dialog, .neu-popover)::-webkit-scrollbar,
+:where(.neu-app, .neu-tray, .neu-dialog, .neu-popover) *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+:where(html, body, .neu-app, .neu-tray, .neu-dialog, .neu-popover)::-webkit-scrollbar-track,
+:where(.neu-app, .neu-tray, .neu-dialog, .neu-popover) *::-webkit-scrollbar-track {
+  background: transparent;
+}
+:where(html, body, .neu-app, .neu-tray, .neu-dialog, .neu-popover)::-webkit-scrollbar-thumb,
+:where(.neu-app, .neu-tray, .neu-dialog, .neu-popover) *::-webkit-scrollbar-thumb {
+  min-height: 44px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, var(--neu-scroll-highlight), transparent 48%),
+    var(--neu-scroll-thumb);
+  background-clip: padding-box;
+  box-shadow:
+    inset 1px 1px 1px var(--neu-scroll-highlight),
+    1px 1px 3px var(--neu-scroll-shadow);
+}
+:where(html, body, .neu-app, .neu-tray, .neu-dialog, .neu-popover)::-webkit-scrollbar-thumb:hover,
+:where(.neu-app, .neu-tray, .neu-dialog, .neu-popover) *::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(145deg, var(--neu-scroll-highlight), transparent 48%),
+    var(--neu-scroll-thumb-hover);
+  background-clip: padding-box;
+}
+:where(html, body, .neu-app, .neu-tray, .neu-dialog, .neu-popover)::-webkit-scrollbar-thumb:active,
+:where(.neu-app, .neu-tray, .neu-dialog, .neu-popover) *::-webkit-scrollbar-thumb:active {
+  box-shadow: inset 2px 2px 4px var(--neu-scroll-shadow);
+}
+:where(html, body, .neu-app, .neu-tray, .neu-dialog, .neu-popover)::-webkit-scrollbar-button,
+:where(.neu-app, .neu-tray, .neu-dialog, .neu-popover) *::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+}
+:where(html, body, .neu-app, .neu-tray, .neu-dialog, .neu-popover)::-webkit-scrollbar-corner,
+:where(.neu-app, .neu-tray, .neu-dialog, .neu-popover) *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.neu-app, .neu-tray { background: var(--neu-bg); color: var(--neu-ink); }
+.neu-app { min-height: 100dvh; font-size: 14px; line-height: 1.55; }
+:where(.neu-app, .neu-tray, .neu-update) :is(.text-gray-400, .text-gray-500, .text-gray-600) { color: var(--neu-muted); }
+:where(.neu-app, .neu-tray, .neu-update) :is(.text-gray-700, .text-gray-800, .text-gray-900, .text-gray-950) { color: var(--neu-ink); }
+:where(.neu-app, .neu-tray, .neu-update) :is(.text-red-500, .text-red-600, .text-red-700) { color: var(--neu-danger); }
+:where(.neu-app, .neu-tray, .neu-update) :is(.text-amber-600, .text-amber-700, .text-orange-800) { color: var(--neu-warning); }
+:where(.neu-app, .neu-tray) :is(.text-green-700, .text-emerald-700, .text-indigo-600, .text-blue-800) { color: var(--neu-accent); }
+:where(.neu-app, .neu-tray) :is(.border-t, .border-b) { border-color: transparent; }
+:where(.neu-app, .neu-tray, .neu-update) :is(.text-\[10px\], .text-\[11px\]) { font-size: 12px; }
+.neu-icon { display: inline-block; flex-shrink: 0; vertical-align: middle; }
+.neu-surface { background: var(--neu-face); color: var(--neu-ink); border-color: transparent; border-radius: var(--neu-radius); box-shadow: var(--neu-raised); }
+.neu-inset { background: var(--neu-face); color: var(--neu-ink); border-color: transparent; border-radius: 14px; box-shadow: var(--neu-inset); }
+.neu-notice { background: var(--neu-warning-bg); color: var(--neu-warning); border-color: transparent; border-radius: 12px; }
+.neu-notice:is(.bg-red-50, .bg-red-100) { background: var(--neu-danger-bg); color: var(--neu-danger); }
+
+/* Controls: a stable hit area, an embossed rest state and debossed pressed state. */
+.neu-control {
+  background: linear-gradient(145deg, var(--neu-high), var(--neu-low));
+  border-color: transparent; border-radius: 12px; box-shadow: var(--neu-small);
+  color: var(--neu-ink); min-height: 36px; cursor: pointer;
+  transition: box-shadow 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+.neu-control:not(:disabled):hover { color: var(--neu-accent); box-shadow: 4px 4px 9px var(--neu-shadow), -4px -4px 9px var(--neu-light); }
+.neu-control:not(:disabled):active, .neu-control[aria-pressed="true"], .neu-control[data-selected="true"] {
+  background: var(--neu-face); box-shadow: var(--neu-inset); color: var(--neu-accent);
+}
+.neu-control:disabled { cursor: not-allowed; opacity: .52; box-shadow: none; background: var(--neu-low); }
+.neu-control:is(.bg-gray-900, .bg-black):not([aria-current]) {
+  background: linear-gradient(145deg, #527493, #426486); color: #fff;
+  box-shadow: 3px 3px 8px var(--neu-shadow), -3px -3px 8px var(--neu-light), inset 1px 1px 0 rgba(255,255,255,.18);
+}
+.neu-control:is(.bg-gray-900, .bg-black):not([aria-current]):hover { color: #fff; background: linear-gradient(145deg, #4f7292, #3b5e80); }
+.neu-control:is(.bg-gray-900, .bg-black):not([aria-current]):active { box-shadow: inset 3px 3px 7px #304d6a, inset -2px -2px 5px #8aa6bf; }
+.neu-control:is(.bg-red-600, .bg-red-500) { background: #a34452; color: #fff; }
+.neu-control:is(.bg-red-600, .bg-red-500):hover { background: #8c3441; color: #fff; }
+.neu-control:is(.text-red-600, .text-red-700) { color: var(--neu-danger); }
+.neu-control:is(.text-red-600, .text-red-700):hover { color: var(--neu-danger); background: var(--neu-danger-bg); }
+:where(.neu-app, .neu-tray, .neu-update) :is(button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--neu-focus); outline-offset: 3px;
+}
+:where(.neu-app, .neu-tray) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-color: transparent; background: var(--neu-face); background-image: none;
+  border-radius: 12px; color: var(--neu-ink); box-shadow: var(--neu-inset); min-height: 40px;
+}
+:where(.neu-app, .neu-tray) :is(input, textarea)::placeholder { color: var(--neu-muted); opacity: .9; }
+:where(.neu-app, .neu-tray) input:is([type="checkbox"], [type="radio"]) { accent-color: #557b9f; }
+:where(.neu-app, .neu-tray) select { cursor: pointer; }
+:where(.neu-app, .neu-tray) option { background: var(--neu-face); color: var(--neu-ink); }
+
+/* Application chrome stays quiet; only controls protrude from its material. */
+.neu-header { background: var(--neu-bg); border: 0; box-shadow: 0 6px 14px var(--neu-shadow); }
+.neu-windowbar { background: var(--neu-bg); height: 32px; }
+.neu-windowbar .neu-control { box-shadow: none; background: transparent; min-height: 28px; border-radius: 8px; }
+.neu-windowbar .neu-control:hover { box-shadow: var(--neu-inset); }
+.neu-toolbar { max-width: 1144px; margin: 0 auto; padding: 12px 32px 20px; }
+.neu-toolbar-grid { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.neu-brand-line { gap: 16px; }
+.neu-brand-lockup { display: flex; align-items: center; gap: 12px; }
+.neu-brand-symbol, .neu-avatar, .neu-metric-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  background: linear-gradient(145deg, var(--neu-high), var(--neu-low)); color: var(--neu-accent); box-shadow: var(--neu-small); border-radius: 14px;
+}
+.neu-brand-symbol { width: 42px; height: 42px; }
+.neu-brand-symbol .neu-icon { width: 23px; height: 23px; }
+.neu-brand-lockup h1 { font-size: 19px; font-weight: 650; letter-spacing: -.6px; }
+.neu-segmented { background: var(--neu-face); box-shadow: var(--neu-inset); padding: 5px; border: 0; border-radius: 14px; gap: 5px; }
+.neu-segmented .neu-control { min-height: 32px; background: transparent; box-shadow: none; padding: 5px 14px; border-radius: 10px; color: var(--neu-muted); }
+.neu-segmented .neu-control:is([aria-current="page"], [aria-pressed="true"]) { color: var(--neu-accent); background: linear-gradient(145deg,var(--neu-high),var(--neu-low)); box-shadow: var(--neu-small); }
+.neu-process-status { flex-basis: 100%; gap: 10px; padding-left: 54px; }
+.neu-process-status > span { border: 0; padding: 0; background: transparent; color: var(--neu-muted); }
+.neu-process-status .neu-control { min-height: 24px; background: transparent; box-shadow: none; padding: 0 6px; }
+.neu-process-status .neu-control:hover { color: var(--neu-danger); }
+.neu-toolbar-actions { gap: 12px; margin-left: 0; }
+.neu-toolbar-actions > .neu-control, .neu-toolbar-actions > .relative > .neu-control { min-height: 40px; }
+.neu-popover { background: var(--neu-face); border: 0; border-radius: 16px; box-shadow: 10px 12px 24px var(--neu-shadow), -4px -4px 16px var(--neu-light); padding: 10px; }
+.neu-popover > .neu-control { background: transparent; box-shadow: none; padding: 10px 12px; min-height: 40px; }
+.neu-popover > .neu-control:hover { background: var(--neu-face); box-shadow: var(--neu-inset); }
+.neu-main { max-width: 1144px; padding: 32px 32px 48px; }
+.neu-main > .space-y-4 { display: flex; flex-direction: column; gap: 28px; }
+.neu-main > .space-y-4 > * { margin-block: 0; }
+.neu-section-label { text-transform: none; letter-spacing: .03em; font-size: 13px; color: var(--neu-muted); font-weight: 600; }
+.neu-account-grid { gap: 24px; align-items: start; }
+
+/* A read-only overview, not a second toolbar. */
+.neu-overview { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
+.neu-eyebrow { font-size: 10px; font-weight: 650; letter-spacing: .17em; color: var(--neu-muted); margin: 0 0 6px; }
+.neu-overview h2 { font-size: 28px; font-weight: 650; line-height: 1.3; letter-spacing: -.6px; margin: 0; }
+.neu-overview-caption { margin-top: 7px; color: var(--neu-muted); font-size: 13px; }
+.neu-overview-metrics { display: flex; gap: 24px; }
+.neu-overview-metric { display: flex; gap: 12px; align-items: center; padding: 14px 20px; border-radius: 16px; box-shadow: var(--neu-raised); min-width: 172px; }
+.neu-metric-icon { width: 38px; height: 38px; box-shadow: var(--neu-inset); }
+.neu-overview-metric div > span { display: block; color: var(--neu-muted); font-size: 12px; }
+.neu-overview-metric strong { display: block; margin-top: 3px; font-size: 22px; line-height: 1.2; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* Accounts: no outlined green card and no rainbow action row. */
+.neu-account { position: relative; padding: 24px; }
+.neu-account-head { gap: 16px; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; }
+.neu-account-identity { display: flex; align-items: center; gap: 14px; min-width: 140px; }
+.neu-avatar { width: 42px; height: 42px; border-radius: 14px; }
+.neu-avatar .neu-icon { width: 20px; height: 20px; }
+.neu-account h3 { font-size: 17px; line-height: 1.45; font-weight: 650; }
+.neu-account-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; max-width: 100%; }
+.neu-account-tools > .neu-control { width: 32px; min-height: 32px; display: inline-flex; justify-content: center; align-items: center; }
+.neu-active-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--neu-accent); box-shadow: 0 0 0 3px var(--neu-low); flex-shrink: 0; }
+.neu-plan { padding: 5px 10px; border: 0; border-radius: 10px; font-size: 12px; font-weight: 600; color: var(--neu-accent); background: var(--neu-face); box-shadow: var(--neu-inset); }
+.neu-account-actions { gap: 12px; margin-top: 20px; align-items: center; }
+.neu-account-actions .neu-control { min-height: 38px; display: inline-flex; justify-content: center; align-items: center; }
+.neu-account-actions .neu-active-button { opacity: 1; color: var(--neu-accent); background: var(--neu-face); box-shadow: var(--neu-inset); cursor: default; }
+.neu-account .neu-usage-group { display: grid; gap: 16px; }
+.neu-account[data-active="true"] .neu-usage-group { grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 24px; }
+.neu-usage { padding: 14px 16px; border-radius: 14px; box-shadow: var(--neu-inset); min-width: 0; }
+.neu-usage-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--neu-muted); margin-bottom: 12px; }
+.neu-usage-heading strong { color: var(--neu-ink); font-size: 22px; line-height: 1; font-weight: 650; font-variant-numeric: tabular-nums; }
+.neu-usage-heading small { font-size: 12px; font-weight: 500; margin-left: 2px; }
+.neu-usage-track { height: 7px; border-radius: 999px; background: var(--neu-low); box-shadow: inset 1px 2px 3px var(--neu-shadow), 0 1px 0 var(--neu-light); overflow: hidden; }
+.neu-usage-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #7e9eb9, #4d7295); box-shadow: inset 0 1px 1px rgba(255,255,255,.45); }
+.neu-usage[data-tone="warning"] .neu-usage-fill { background: linear-gradient(90deg,#c6ab7f,#a17d43); }
+.neu-usage[data-tone="danger"] .neu-usage-fill { background: linear-gradient(90deg,#dca0aa,#a94d5c); }
+.neu-usage-meta { margin-top: 9px; color: var(--neu-muted); font-size: 12px; line-height: 1.5; }
+.neu-credits { grid-column: 1 / -1; }
+.neu-stats { margin-top: 24px; padding-top: 4px; border: 0; }
+.neu-stat-tile { background: var(--neu-face); border: 0; border-radius: 14px; box-shadow: var(--neu-small); padding: 13px 14px; }
+.neu-stat-value { font-size: 20px; font-weight: 650; line-height: 1.3; font-variant-numeric: tabular-nums; white-space: normal; overflow-wrap: anywhere; }
+.neu-stat-grid { gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr)); }
+.neu-chart { background: var(--neu-face); border: 0; border-radius: 14px; box-shadow: var(--neu-inset); padding: 14px 16px 16px; }
+.neu-chart .neu-control { box-shadow: none; }
+.neu-chart-bars { height: 76px; }
+.neu-chart-bar { background: linear-gradient(0deg,#7c9cb8,#4f7497); border-radius: 4px 4px 2px 2px; box-shadow: inset 1px 0 0 rgba(255,255,255,.25); }
+.neu-chart-bar[data-empty="true"] { background: var(--neu-accent-light); opacity: .45; }
+.neu-chart-tooltip { background: var(--neu-ink); color: var(--neu-face); }
+.neu-details { background: var(--neu-face); border: 0; border-radius: 14px; box-shadow: var(--neu-small); }
+.neu-details > summary { min-height: 42px; border-radius: 14px; padding: 10px 14px; }
+.neu-details > summary:hover { background: var(--neu-low); }
+.neu-details[open] { box-shadow: var(--neu-inset); }
+
+/* Modal material and inset tabs share the same system as the main window. */
+.neu-scrim { background: var(--neu-scrim); backdrop-filter: blur(4px); padding: 16px 0; }
+.neu-dialog { background: var(--neu-face); color: var(--neu-ink); border: 0; border-radius: 16px; box-shadow: 14px 18px 38px rgba(31,45,63,.22), inset 1px 1px 1px var(--neu-light); }
+.neu-dialog > :is(.p-5, .flex.p-5) { padding: 22px 24px; }
+.neu-dialog h2 { font-size: 20px; }
+.neu-dialog-tabs { margin: 0 24px; border: 0; border-radius: 14px; padding: 5px; box-shadow: var(--neu-inset); gap: 6px; }
+.neu-dialog-tabs .neu-control { box-shadow: none; background: transparent; border: 0; border-radius: 10px; margin: 0; padding: 9px 12px; color: var(--neu-muted); }
+.neu-dialog-tabs .neu-control[aria-pressed="true"] { box-shadow: var(--neu-small); background: var(--neu-face); color: var(--neu-accent); }
+.neu-dialog .neu-close { width: 32px; min-height: 32px; display: flex; align-items: center; justify-content: center; }
+.neu-update .neu-surface { box-shadow: 10px 12px 28px var(--neu-shadow), -5px -5px 18px var(--neu-light); }
+.neu-toast { z-index: 60; max-width: calc(100vw - 32px); text-align: center; }
+
+/* Compact tray: less elevation, keeping its existing native window dimensions. */
+.neu-tray { border: 0; border-radius: 16px; box-shadow: none; }
+.neu-tray-head { padding: 12px; gap: 9px; }
+.neu-tray-head .neu-brand-symbol { width: 28px; height: 28px; border-radius: 9px; font-size: 12px; }
+.neu-tray-head .neu-control { min-height: 28px; }
+.neu-tray-scroll { padding: 8px 12px; }
+.neu-tray-account { padding: 12px; margin-bottom: 12px; border-radius: 14px; background: var(--neu-face); box-shadow: var(--neu-small); }
+.neu-tray-account[data-active="true"] { box-shadow: var(--neu-inset); }
+.neu-tray-account:hover { box-shadow: var(--neu-inset); }
+.neu-tray .neu-inset { box-shadow: var(--neu-small); }
+.neu-tray .neu-control { min-height: 30px; }
+.neu-tray footer, .neu-tray-footer { padding: 10px 12px; gap: 12px; }
+.neu-tray .neu-usage-track { height: 6px; }
+.neu-history .neu-surface { box-shadow: var(--neu-small); }
+.neu-history aside .neu-control { box-shadow: none; background: transparent; }
+.neu-history aside .neu-control[aria-pressed="true"] { box-shadow: var(--neu-inset); color: var(--neu-accent); }
+
+@media (max-width: 900px) {
+  .neu-toolbar-grid { flex-wrap: wrap; gap: 14px; }
+  .neu-toolbar-actions { margin-left: auto; }
+  .neu-overview-metric { min-width: 140px; padding: 12px; }
+  .neu-overview-metrics { gap: 16px; }
+  .neu-stat-grid { gap: 12px; }
+}
+@media (max-width: 639px) {
+  .neu-header { position: relative; }
+  .neu-toolbar { padding: 8px 20px 20px; }
+  .neu-windowbar:not(:has(button)) { height: 14px; }
+  .neu-brand-line { gap: 12px; }
+  .neu-brand-lockup h1 { font-size: 18px; }
+  .neu-process-status { padding-left: 0; }
+  .neu-toolbar-actions { margin-left: 0; flex-wrap: wrap; width: 100%; min-width: 0; flex-shrink: 1; }
+  .neu-main { padding: 24px 20px 40px; }
+  .neu-overview { flex-direction: column; align-items: stretch; gap: 20px; }
+  .neu-overview h2 { font-size: 24px; }
+  .neu-overview-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+  .neu-overview-metric { min-width: 0; padding: 12px; gap: 10px; }
+  .neu-metric-icon { width: 30px; height: 30px; border-radius: 10px; }
+  .neu-overview-metric strong { font-size: 20px; }
+  .neu-account { padding: 18px; }
+  .neu-account-head { gap: 14px; }
+  .neu-account-identity { min-width: 0; flex-basis: 100%; }
+  .neu-account-tools { justify-content: flex-start; }
+  .neu-account[data-active="true"] .neu-usage-group { grid-template-columns: 1fr; }
+  .neu-account h3 { font-size: 16px; }
+  .neu-control, .neu-account-actions .neu-control, .neu-account-tools > .neu-control, .neu-toolbar-actions .neu-control { min-height: 44px; }
+  .neu-account-tools > .neu-control { width: 44px; }
+  .neu-account-actions { gap: 10px; }
+  .neu-stat-value { font-size: 18px; }
+  .neu-stat-tile { padding: 12px; }
+  .neu-dialog > :is(.p-5, .flex.p-5) { padding: 20px; }
+  .neu-dialog-tabs { margin-inline: 20px; }
+  .neu-dialog-tabs .neu-control { padding-inline: 8px; }
+  .neu-dialog input, .neu-dialog textarea { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.neu-app, .neu-tray, .neu-update) *, :where(.neu-app, .neu-tray, .neu-update) *::before, :where(.neu-app, .neu-tray, .neu-update) *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important;
+  }
+}
+@media (forced-colors: active) {
+  .neu-surface, .neu-inset, .neu-dialog, .neu-control, .neu-plan, .neu-usage, .neu-overview-metric { box-shadow: none; border: 1px solid CanvasText; }
+  .neu-control:is([aria-pressed="true"], [aria-current="page"]), .neu-account[data-active="true"] { outline: 2px solid Highlight; }
+  .neu-usage-fill, .neu-chart-bar { background: Highlight; }
+}
+
+.neu-usage-group > * { margin-block: 0; }
+.neu-cache-note {
+  grid-column: 1 / -1;
+  margin: 0 0 6px;
+  color: var(--neu-warning);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+
+.neu-tray-stat { background: var(--neu-face); box-shadow: var(--neu-small); border-radius: 10px; }
+.neu-tray .text-emerald-500, .neu-tray .text-emerald-600 { color: var(--neu-accent); }
+.neu-tray .bg-emerald-500 { background: var(--neu-accent); }
+.neu-tray-limit[data-tone="warning"] .neu-usage-fill { background: linear-gradient(90deg,#c6ab7f,#a17d43); }
+.neu-tray-limit[data-tone="danger"] .neu-usage-fill { background: linear-gradient(90deg,#dca0aa,#a94d5c); }
+.neu-details > summary > span { background: var(--neu-face); box-shadow: var(--neu-inset); border-radius: 8px; }
+.neu-chart-tooltip { max-width: min(260px, calc(100vw - 64px)); white-space: normal; overflow-wrap: anywhere; }
+
+.neu-quota-section-label { margin: 0 0 10px; color: var(--neu-muted); font-size: 12px; font-weight: 600; }
+
+/* Keep secondary accounts quick to scan, with all actions still expandable. */
+.neu-extra-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.neu-extra-actions[hidden] { display: none; }
+.neu-overview .neu-quota-metric { display: grid; grid-template-columns: auto minmax(0, 1fr); row-gap: 4px; }
+.neu-overview-timestamp { grid-column: 1 / -1; font-size: 11px; color: var(--neu-muted); }
+.neu-overview-timestamp > span { display: inline-block; }
+.neu-account[data-compact="true"] .neu-account-actions > button { flex-basis: auto; }
+.neu-account[data-compact="true"] .neu-usage-group { gap: 10px; }
+.neu-account[data-compact="true"] .neu-usage { padding: 10px 12px; }
+.neu-account[data-compact="true"] .neu-usage-heading { margin-bottom: 8px; }
+.neu-account[data-compact="true"] .neu-usage-heading strong { font-size: 18px; }
+.neu-account[data-compact="true"] .neu-quota-section-label { display: none; }
+@media (min-width: 600px) {
+  .neu-account[data-compact="true"] .neu-usage-group { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

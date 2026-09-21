@@ -38,7 +38,11 @@ const scenarios = ['renewal','expiry-only','unverified-error','cached-error','no
             case 'get_usage':data=usage(args.accountId);break;
             case 'check_codex_processes':data={count:0,background_count:0,can_switch:true,pids:[]};break;
             case 'get_masked_account_ids':data=[];break;
-            case 'get_account_usage_stats':data={account_id:args.accountId,available:false,error:null,reset_credits:null};break;
+            case 'get_account_usage_stats':data={account_id:args.accountId,available:false,error:null,reset_credits:null,
+              source:'Codex usage stats via ChatGPT backend',generated_at:null,stats_as_of:null,
+              summary:{lifetime_tokens:null,peak_daily_tokens:null,longest_task_seconds:null,current_streak_days:null,longest_streak_days:null},
+              activity:{fast_mode_percent:null,reasoning_effort:null,reasoning_effort_percent:null,skills_explored:null,total_skills_used:null,total_threads:null},
+              daily:[],top_invocations:[]};break;
             case 'add_account_from_auth_json_text':data={...account,id:'imported-test',name:'Imported test',is_active:false};accounts.push(data);break;
             default:unexpected.push(command);status=500;data={error:'Unexpected test request'};
           }
@@ -68,7 +72,8 @@ const scenarios = ['renewal','expiry-only','unverified-error','cached-error','no
           await (await chooser).setFiles({name:'test-auth.json',mimeType:'application/json',buffer:Buffer.from('{}')});
           await page.getByRole('button',{name:'导入',exact:true}).click();
           await page.getByRole('dialog').waitFor({state:'hidden'});
-          assert.equal(await page.getByText(label,{exact:true}).count(),2,'Imported account must show live renewal');
+          await page.locator('.neu-account').filter({hasText:'Imported test'}).getByRole('button',{name:'更多操作',exact:true}).click();
+          assert.equal(await page.getByText(label,{exact:true}).count(),2,'Expanded imported account must show live renewal');
         }
         assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
         report.push({scenario,viewport,mobile,metadataCalls:calls});

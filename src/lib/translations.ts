@@ -1,5 +1,13 @@
 // English source strings are stable message keys. Keep placeholders identical.
 export const zh = {
+  "Codex quota": "Codex 额度",
+
+  "Account overview": "账号总览",
+  "Your accounts and usage, in one place.": "集中管理账号，清晰掌握每一份额度。",
+  "Connected accounts": "已连接账号",
+  "Current remaining": "当前剩余额度",
+  "Lowest remaining quota window": "取当前账号各额度窗口中剩余最少的一项",
+
   "Language": "语言",
   "Language changes apply immediately and are saved on this device.": "切换后立即生效，并在此设备上记住选择。",
   "Never": "从未",
@@ -146,6 +154,11 @@ export const zh = {
   "Weekly Limit": "每周额度",
   "Fetching usage...": "正在获取用量…",
   "No rate limit data": "暂无额度数据",
+  "More actions": "更多操作",
+  "Fewer actions": "收起操作",
+  "Cached quota": "缓存额度",
+  "Cached quota from {0}": "缓存额度 · {0}",
+  "Live quota is temporarily unavailable.": "实时额度暂时无法获取，当前显示最近一次成功数据。",
   "Credits:": "余额：",
   "Usage info not available for API key accounts": "API Key 账号不支持用量查询",
   "Could not check running Codex processes. Try again.": "无法检查正在运行的 Codex 进程，请重试。",
@@ -219,6 +232,8 @@ export const zh = {
   "Appearance": "外观",
   "☾ Dark": "☾ 深色",
   "☀ Light": "☀ 浅色",
+  "Switch to dark theme": "切换为深色主题",
+  "Switch to light theme": "切换为浅色主题",
   "Timed warm-up": "定时预热",
   "No times added yet.": "尚未添加时间。",
   "Remove {0}": "删除 {0}",
