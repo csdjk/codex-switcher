@@ -5,7 +5,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const baseURL = process.env.UI_BASE_URL || 'http://127.0.0.1:1420';
 const output = path.resolve('Temp/subscription-qa');
-const checked = new Date().toISOString();
+// Keep future-renewal fixtures future-relative to the browser clock, not wall time.
+const fixtureNow = new Date('2026-09-21T12:00:00.000Z');
+const checked = fixtureNow.toISOString();
 const live = {renews_at:'2026-10-08T04:28:49Z',expires_at:'2026-10-09T05:28:49Z',checked_at:checked};
 const account = {id:'subscription-test',name:'Subscription test',email:'test@example.invalid',auth_mode:'chat_g_p_t',plan_type:'pro',subscription_expires_at:'2026-08-31T00:00:00Z',subscription:null,is_active:true,created_at:checked,last_used_at:null};
 const usage = id => ({account_id:id,plan_type:'pro',primary_used_percent:25,primary_window_minutes:300,secondary_used_percent:65,secondary_window_minutes:10080,primary_resets_at:null,secondary_resets_at:null,has_credits:false,unlimited_credits:false,credits_balance:null,error:null});
@@ -27,7 +29,8 @@ const scenarios = ['renewal','expiry-only','unverified-error','cached-error','no
           const args=route.request().postDataJSON();
           let data,status=200;
           switch(command){
-            case 'list_accounts':data=accounts;break;
+            case 'get_token_speed_snapshot': data={sessions:[],checked_at:Date.now(),partial:false};break;
+      case 'list_accounts':data=accounts;break;
             case 'refresh_account_metadata':{
               calls++;
               if(scenario.endsWith('error')) {status=503;data={error:'Subscription service unavailable'};break;}
@@ -49,6 +52,7 @@ const scenarios = ['renewal','expiry-only','unverified-error','cached-error','no
           await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
         });
         const page=await context.newPage();
+        await page.clock.setFixedTime(fixtureNow);
         const errors=[];page.on('pageerror',e=>errors.push(e.message));
         await page.goto(baseURL);
         const label=scenario==='renewal'?'下次续订：2026年10月8日':scenario==='expiry-only'?'权益截止：2026年10月9日':scenario==='unverified-error'?'订阅日期同步失败':scenario==='cached-error'?'下次续订：2026年10月8日（上次查询）':'接口未提供订阅日期';

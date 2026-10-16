@@ -28,6 +28,7 @@ async function fixtures(context, mode) {
     const args=route.request().postDataJSON() || {};
     let payload;
     switch(command){
+      case 'get_token_speed_snapshot': payload={sessions:[],checked_at:Date.now(),partial:false};break;
       case 'list_accounts': payload=mode.value==='empty'?[]:accounts;break;
       case 'get_usage': payload=usage(args.accountId);break;
       case 'get_account_usage_stats': payload=stats(args.accountId);break;

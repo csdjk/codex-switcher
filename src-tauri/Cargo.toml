@@ -1,6 +1,6 @@
 [package]
 name = "codex-switcher"
-version = "0.2.18"
+version = "0.2.19"
 description = "A multi-account manager for Codex CLI"
 authors = ["lampese"]
 edition = "2021"
@@ -42,3 +42,7 @@ pbkdf2 = "0.12"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "1"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+# Compatible with the existing Tauri 2.10 lockfile; includes Windows foreground handoff.
+tauri-plugin-single-instance = "=2.4.5"

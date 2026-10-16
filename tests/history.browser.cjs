@@ -69,6 +69,7 @@ async function installFixtures(context, mode) {
     const args = route.request().postDataJSON() || {};
     let payload;
     switch (command) {
+      case 'get_token_speed_snapshot': payload={sessions:[],checked_at:Date.now(),partial:false};break;
       case 'list_accounts': payload = []; break;
       case 'get_masked_account_ids': payload = []; break;
       case 'check_codex_processes': payload = mode.value === 'blocked'

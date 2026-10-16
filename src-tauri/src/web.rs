@@ -128,6 +128,7 @@ fn handle_request(mut request: Request, runtime: &Runtime, dist_dir: &Path) -> a
 
 async fn invoke_web_command(command: &str, payload: Value) -> Result<Value, String> {
     match command {
+        "get_token_speed_snapshot" => to_json(crate::token_speed::get_token_speed_snapshot().await?),
         "list_accounts" => to_json(list_accounts().await?),
         "get_active_account_info" => to_json(get_active_account_info().await?),
         "add_account_from_file" => {

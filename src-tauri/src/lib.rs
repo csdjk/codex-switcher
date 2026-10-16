@@ -13,6 +13,7 @@ mod quota_icon;
 #[cfg(desktop)]
 pub mod tray;
 pub mod types;
+pub mod token_speed;
 pub mod web;
 
 use commands::{
@@ -30,7 +31,20 @@ use tauri::Emitter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Must run before any other plugin or WebView is created. A duplicate launch
+    // should reveal the existing app, never compete for the same WebView2 profile.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        let handle = app.clone();
+        if let Err(error) = app.run_on_main_thread(move || {
+            commands::restore_main_window(&handle);
+        }) {
+            eprintln!("Failed to restore the existing application window: {error}");
+        }
+    }));
+
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
@@ -90,6 +104,8 @@ pub fn run() {
             start_login,
             complete_login,
             cancel_login,
+            // Local, read-only model throughput
+            token_speed::get_token_speed_snapshot,
             // Usage
             get_usage,
             get_account_usage_stats,

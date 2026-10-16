@@ -1,12 +1,15 @@
 {
   "name": "codex-switcher",
   "private": true,
-  "version": "0.2.18",
+  "version": "0.2.19",
   "description": "A multi-account manager for Codex CLI",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test:token-speed": "node --experimental-strip-types --test tests/tokenSpeed.test.ts",
+    "test:token-speed-ui": "node tests/tokenSpeed.browser.cjs",
+    "test:window-startup": "powershell.exe -NoProfile -File tests/windowStartup.ps1",
     "test:desktop-reopen": "node --experimental-strip-types --test tests/desktopReopen.test.ts",
     "test:reset-credits": "node --experimental-strip-types --test tests/resetCredits.test.ts",
     "test:i18n": "node --experimental-strip-types --test tests/i18n.test.ts",

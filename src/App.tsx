@@ -7,6 +7,7 @@ import { useAccounts } from "./hooks/useAccounts";
 import { useDesktopReopen } from "./hooks/useDesktopReopen";
 import { UiIcon } from "./components/UiIcon";
 import { AccountOverview } from "./components/AccountOverview";
+import { TokenSpeedPanel } from "./components/TokenSpeedPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { finishForceClose, type DesktopReopenPreference } from "./lib/desktopReopen";
 import { useForceCloseCodexProcesses } from "./hooks/useForceCloseCodexProcesses";
@@ -1682,6 +1683,7 @@ function App() {
       {/* Main Content */}
       <main className="neu-main max-w-5xl mx-auto px-6 pt-4 pb-8">
         {activePage === "accounts" && accounts.length > 0 && !error && <AccountOverview count={accounts.length} usage={activeAccount?.usage} />}
+        {activePage === "accounts" && <TokenSpeedPanel />}
         {activePage === "sessions" && canManageHistory ? (
           <SessionManagerPage />
         ) : loading && accounts.length === 0 ? (
